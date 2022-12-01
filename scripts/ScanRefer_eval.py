@@ -177,7 +177,7 @@ def eval_ref(args):
             for data in tqdm(dataloader):
 
                 # scanrefer++ support
-                for scene_id in data_dict["scene_id"]:
+                for scene_id in data["scene_id"]:
                     if scene_id not in final_output:
                         final_output[scene_id] = []
 
