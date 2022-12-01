@@ -94,14 +94,16 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
     # store
     data_dict["ref_acc"] = ref_acc.cpu().numpy().tolist()
 
+    # scanrefer++ support, use threshold to filter predictions instead of argmax
+    pred_ref_mul_obj_mask = (data_dict["cluster_ref"] * pred_masks) > 5
+    # end
+
     # compute localization metricens
     if use_best:
         pred_ref = torch.argmax(data_dict["cluster_labels"], 1)  # (B,)
         # store the calibrated predictions and masks
 
-        # scanrefer++ support, use threshold to filter predictions instead of argmax
-        pred_ref_mul_obj_mask = (data_dict["cluster_ref"] * pred_masks) > 5
-        # end
+
 
         data_dict['cluster_ref'] = data_dict["cluster_labels"]
     if use_cat_rand:
