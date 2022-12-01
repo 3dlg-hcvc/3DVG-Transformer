@@ -215,6 +215,7 @@ class ScannetReferenceDataset(Dataset):
         ref_size_class_label_list = []
         ref_size_residual_label_list = []
 
+
         if self.split != "test":
             num_bbox = instance_bboxes.shape[0] if instance_bboxes.shape[0] < MAX_NUM_OBJ else MAX_NUM_OBJ
             target_bboxes_mask[0:num_bbox] = 1
@@ -336,7 +337,7 @@ class ScannetReferenceDataset(Dataset):
         data_dict = {}
         data_dict["point_clouds"] = point_cloud.astype(np.float32) # point cloud data including features
         data_dict["unk"] = unk.astype(np.float32)
-
+        data_dict["scene_id"] = scene_id
         data_dict["istrain"] = istrain
         data_dict["center_label"] = target_bboxes.astype(np.float32)[:,0:3] # (MAX_NUM_OBJ, 3) for GT box center XYZ
         data_dict["heading_class_label"] = angle_classes.astype(np.int64) # (MAX_NUM_OBJ,) with int values in 0,...,NUM_HEADING_BIN-1
