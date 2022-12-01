@@ -142,7 +142,7 @@ def eval_ref(args):
     } if not args.no_nms else None
 
     # random seeds
-    seeds = [args.seed] + [2 * i for i in range(args.repeat - 1)]
+    seeds = [args.seed]
 
     # evaluate
     print("evaluating...")
@@ -162,6 +162,11 @@ def eval_ref(args):
             torch.backends.cudnn.benchmark = False
             np.random.seed(seed)
 
+            # scanrefer++ support
+            final_output = {}
+            mem_hash = {}
+
+
             print("generating the scores for seed {}...".format(seed))
             ref_acc = []
             ious = []
@@ -170,6 +175,12 @@ def eval_ref(args):
             lang_acc = []
             predictions = {}
             for data in tqdm(dataloader):
+
+                # scanrefer++ support
+                for scene_id in data_dict["scene_id"]:
+                    if scene_id not in final_output:
+                        final_output[scene_id] = []
+
                 for key in data:
                     data[key] = data[key].cuda()
 
@@ -191,8 +202,11 @@ def eval_ref(args):
                         use_oracle=args.use_oracle,
                         use_cat_rand=args.use_cat_rand,
                         use_best=args.use_best,
-                        post_processing=POST_DICT
+                        post_processing=POST_DICT,
+                        final_output=final_output,  # scanrefer++ support
+                        mem_hash=mem_hash  # scanrefer++ support
                     )
+
 
                     ref_acc += data["ref_acc"]
                     ious += data["ref_iou"]
@@ -224,6 +238,15 @@ def eval_ref(args):
             # save the last predictions
             with open(pred_path, "wb") as f:
                 pickle.dump(predictions, f)
+
+            # scanrefer+= support
+            for key, value in final_output.items():
+                for query in value:
+                    query["aabbs"] = [item.tolist() for item in query["aabbs"]]
+                os.makedirs("scanrefer++_test", exist_ok=True)
+                with open(f"scanrefer++_test/{key}.json", "w") as f:
+                    json.dump(value, f)
+            # end
 
             # save to global
             ref_acc_all.append(ref_acc)
@@ -279,9 +302,7 @@ def eval_ref(args):
         stats[k] = {}
         for k_o, v_o in others_dict.items():
             stats[k][k_o] = np.sum(np.logical_and(masks[0] == v, others[0] == v_o))
-
         stats[k]["overall"] = np.sum(masks[0] == v)
-
     stats["overall"] = {}
     for k_o, v_o in others_dict.items():
         stats["overall"][k_o] = np.sum(others[0] == v_o)
