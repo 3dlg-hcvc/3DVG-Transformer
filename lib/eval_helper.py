@@ -79,6 +79,9 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
     batch_size, len_nun_max = data_dict['ref_center_label_list'].shape[:2]
     cluster_preds = torch.argmax(data_dict["cluster_ref"], 1).long().unsqueeze(1).repeat(1,pred_masks.shape[1])
 
+
+
+
     preds = torch.zeros(data_dict["cluster_ref"].shape).cuda()
     preds = preds.scatter_(1, cluster_preds, 1)
     cluster_preds = preds
@@ -110,8 +113,7 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
             sem_cls_label = data_dict["sem_cls_label"][i]
             # sem_cls_label = torch.argmax(end_points["sem_cls_scores"], 2)[i]
             sem_cls_label[num_bbox:] -= 1
-            candidate_masks = torch.gather(sem_cls_label == data_dict["object_cat"][i], 0,
-                                           data_dict["object_assignment"][i])
+            candidate_masks = torch.gather(sem_cls_label == data_dict["object_cat"][i], 0, data_dict["object_assignment"][i])
             candidates = torch.arange(cluster_labels.shape[1])[candidate_masks]
             try:
                 chosen_idx = torch.randperm(candidates.shape[0])[0]
@@ -244,7 +246,7 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
                     "ann_id": data_dict["ann_id"].flatten()[i].item(),
                     "aabbs": multi_pred_bboxes
                 }
-                scene_id = data_dict["scene_id"][i // data_dict["chunk_ids"].shape[1]]
+                scene_id = data_dict["scene_id"][i]
                 key = (scene_id, output_info["object_id"], output_info["ann_id"])
                 if final_output is not None and key not in mem_hash:
                     final_output[scene_id].append(output_info)

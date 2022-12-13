@@ -21,6 +21,7 @@ class DETR3D(nn.Module):  # just as a backbone; encoding afterward
                          DETR can detect in a single image. For COCO, we recommend 100 queries.
             aux_loss: True if auxiliary decoding losses (loss at each decoder layer) are to be used.
         """
+
         super().__init__()
         transformer_type = config_transformer.get('transformer_type', 'enc_dec')
         self.transformer_type = transformer_type
@@ -54,10 +55,10 @@ class DETR3D(nn.Module):  # just as a backbone; encoding afterward
         self.weighted_input = config_transformer.get('weighted_input', False)
         if self.weighted_input:
             print('[INFO!] Use Weighted Input!')
-
         if self.pos_embd_type in ['self', 'none']:
             self.pos_embd = None
-        #else:
+
+        # else:
         #    self.pos_embd = build_position_encoding(config_transformer.position_embedding, hidden_dim, config_transformer.input_dim)
         self.aux_loss = aux_loss
 

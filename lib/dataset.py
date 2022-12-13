@@ -370,6 +370,8 @@ class ScannetReferenceDataset(Dataset):
         data_dict["object_id_list"] = np.array(object_id_list).astype(np.int64)
         data_dict["ann_id_list"] = np.array(ann_id_list).astype(np.int64)
         data_dict["object_cat_list"] = np.array(object_cat_list).astype(np.int64)
+        data_dict["object_id"] = np.array(object_id_list).astype(np.int64)
+        data_dict["ann_id"] = np.array(ann_id_list).astype(np.int64)
 
         unique_multiple_list = []
         for i in range(self.lang_num_max):
