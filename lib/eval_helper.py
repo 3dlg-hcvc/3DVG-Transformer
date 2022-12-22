@@ -97,9 +97,9 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
     # store
     data_dict["ref_acc"] = ref_acc.cpu().numpy().tolist()
 
-    # scanrefer++ support, use threshold to filter predictions instead of argmax
-    pred_ref_mul_obj_mask = (data_dict["cluster_ref"] * pred_masks) > 5
-    # end
+    # # scanrefer++ support, use threshold to filter predictions instead of argmax
+    # pred_ref_mul_obj_mask = (data_dict["cluster_ref"] * pred_masks) > 5
+    # # end
 
     # compute localization metricens
     if use_best:
@@ -227,31 +227,31 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
                 flag = 1 if data_dict["object_cat_list"][i][j] == 17 else 0
                 others.append(flag)
 
-                # scanrefer++ support
-                multi_pred_bboxes = []
-                multi_pred_ref_idxs = pred_ref_mul_obj_mask[i].nonzero()
-                for idx in multi_pred_ref_idxs:
-                    pred_obb = config.param2obb(
-                        pred_center[i, idx, 0:3].detach().cpu().numpy(),
-                        pred_heading_class[i, idx].detach().cpu().numpy(),
-                        pred_heading_residual[i, idx].detach().cpu().numpy(),
-                        pred_size_class[i, idx].detach().cpu().numpy(),
-                        pred_size_residual[i, idx].detach().cpu().numpy()
-                    )
-                    # pred_bbox = get_3d_box(pred_obb[3:6], pred_obb[6], pred_obb[0:3])
-                    pred_bbox = construct_bbox_corners(pred_obb[0:3], pred_obb[3:6])
-                    multi_pred_bboxes.append(pred_bbox)
-                output_info = {
-                    "object_id": data_dict["object_id"].flatten()[i].item(),
-                    "ann_id": data_dict["ann_id"].flatten()[i].item(),
-                    "aabbs": multi_pred_bboxes
-                }
-                scene_id = data_dict["scene_id"][i]
-                key = (scene_id, output_info["object_id"], output_info["ann_id"])
-                if final_output is not None and key not in mem_hash:
-                    final_output[scene_id].append(output_info)
-                mem_hash[key] = True
-                # end
+                # # scanrefer++ support
+                # multi_pred_bboxes = []
+                # multi_pred_ref_idxs = pred_ref_mul_obj_mask[i].nonzero()
+                # for idx in multi_pred_ref_idxs:
+                #     pred_obb = config.param2obb(
+                #         pred_center[i, idx, 0:3].detach().cpu().numpy(),
+                #         pred_heading_class[i, idx].detach().cpu().numpy(),
+                #         pred_heading_residual[i, idx].detach().cpu().numpy(),
+                #         pred_size_class[i, idx].detach().cpu().numpy(),
+                #         pred_size_residual[i, idx].detach().cpu().numpy()
+                #     )
+                #     # pred_bbox = get_3d_box(pred_obb[3:6], pred_obb[6], pred_obb[0:3])
+                #     pred_bbox = construct_bbox_corners(pred_obb[0:3], pred_obb[3:6])
+                #     multi_pred_bboxes.append(pred_bbox)
+                # output_info = {
+                #     "object_id": data_dict["object_id"].flatten()[i].item(),
+                #     "ann_id": data_dict["ann_id"].flatten()[i].item(),
+                #     "aabbs": multi_pred_bboxes
+                # }
+                # scene_id = data_dict["scene_id"][i]
+                # key = (scene_id, output_info["object_id"], output_info["ann_id"])
+                # if final_output is not None and key not in mem_hash:
+                #     final_output[scene_id].append(output_info)
+                # mem_hash[key] = True
+                # # end
 
     # lang
     if reference and use_lang_classifier:

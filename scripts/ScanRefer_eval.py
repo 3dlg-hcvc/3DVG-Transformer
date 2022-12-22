@@ -184,6 +184,7 @@ def eval_ref(args):
                 for key in data:
                     if key != "scene_id":
                         data[key] = data[key].cuda()
+                # end
 
                 # feed
                 with torch.no_grad():

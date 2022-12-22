@@ -342,7 +342,8 @@ class Solver():
         for data_dict in dataloader:
             # move to cuda
             for key in data_dict:
-                data_dict[key] = data_dict[key].cuda()
+                if key != "scene_id":
+                    data_dict[key] = data_dict[key].cuda()
 
             # initialize the running loss
             self._running_log = {

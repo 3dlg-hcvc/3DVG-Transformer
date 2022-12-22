@@ -19,6 +19,8 @@ class SoftmaxRankingLoss(nn.Module):
         return loss
 
 
+
+
 class SoftmaxRankingLoss2(nn.Module):
     def __init__(self):
         super().__init__()

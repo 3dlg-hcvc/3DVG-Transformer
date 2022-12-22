@@ -20,6 +20,7 @@ NEAR_THRESHOLD = 0.3
 GT_VOTE_FACTOR = 3  # number of GT votes per point
 OBJECTNESS_CLS_WEIGHTS = [0.2, 0.8]  # put larger weights on positive objectness
 
+SCANREFER_ENHANCE = True
 
 def compute_vote_loss(data_dict):
     """ Compute vote loss: Match predicted votes to GT votes.
@@ -267,6 +268,12 @@ def compute_reference_loss(data_dict, config, no_reference=False):
 
     # print("cluster_preds",cluster_preds.shape)
     criterion = SoftmaxRankingLoss()
+
+    # scanrefer++
+    # criterion = nn.MultiLabelSoftMarginLoss()
+    # end
+
+
     loss = 0.
     gt_labels = np.zeros((batch_size, len_nun_max, num_proposals))
     for i in range(batch_size):
@@ -278,6 +285,8 @@ def compute_reference_loss(data_dict, config, no_reference=False):
         labels = np.zeros((len_nun_max, num_proposals))
         for j in range(len_nun_max):
             if j < lang_num[i]:
+
+
                 # convert the bbox parameters to bbox corners
                 pred_obb_batch = config.param2obb_batch(pred_center[i, :, 0:3], pred_heading_class[i],
                                                         pred_heading_residual[i],
@@ -287,6 +296,13 @@ def compute_reference_loss(data_dict, config, no_reference=False):
 
                 if data_dict["istrain"][0] == 1 and not no_reference and data_dict["random"] < 0.5:
                     ious = ious * objectness_masks[i]
+
+                ## scanrefer++ support
+                if SCANREFER_ENHANCE:
+                    # TODO do multi ious calculations
+                    gt_boxes_num = data_dict["multi_ref_box_label_list"][i][j].sum()
+                    # pick the top k ious
+                    ious_indices = torch.topk(ious, gt_boxes_num).indices
 
                 ious_ind = ious.argmax()
                 max_ious = ious[ious_ind]
