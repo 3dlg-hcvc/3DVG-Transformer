@@ -20,7 +20,7 @@ NEAR_THRESHOLD = 0.3
 GT_VOTE_FACTOR = 3  # number of GT votes per point
 OBJECTNESS_CLS_WEIGHTS = [0.2, 0.8]  # put larger weights on positive objectness
 
-SCANREFER_ENHANCE = True
+SCANREFER_ENHANCE = False
 
 def compute_vote_loss(data_dict):
     """ Compute vote loss: Match predicted votes to GT votes.
@@ -248,16 +248,24 @@ def compute_reference_loss(data_dict, config, no_reference=False):
     pred_size_residual = pred_size_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal,3
 
 
+    # update
+    box_mask = data_dict["ref_box_label_list"].to(torch.float32)
+    gt_center_list = torch.einsum("abc,adb->adc", data_dict["center_label"], box_mask).cpu().numpy()
+    gt_size_class_list = torch.einsum("ab,acb->ac", data_dict["size_class_label"].to(torch.float32), box_mask).to(torch.long).cpu().numpy()
+    gt_size_residual_list = torch.einsum("abc,adb->adc", data_dict["size_residual_label"], box_mask).cpu().numpy()
 
-    gt_center_list = data_dict['ref_center_label_list'].cpu().numpy()  # (B,3)
+
+    # gt_center_list = data_dict['ref_center_label_list'].cpu().numpy()  # (B,3)
+
     gt_heading_class_list = data_dict['ref_heading_class_label_list'].cpu().numpy()  # B
     gt_heading_residual_list = data_dict['ref_heading_residual_label_list'].cpu().numpy()  # B
-    gt_size_class_list = data_dict['ref_size_class_label_list'].cpu().numpy()  # B
-    gt_size_residual_list = data_dict['ref_size_residual_label_list'].cpu().numpy()  # B,3
+    # gt_size_class_list = data_dict['ref_size_class_label_list'].cpu().numpy()  # B
+    # gt_size_residual_list = data_dict['ref_size_residual_label_list'].cpu().numpy()  # B,3
     # convert gt bbox parameters to bbox corners
     batch_size, num_proposals = data_dict['aggregated_vote_features'].shape[:2]
     batch_size, len_nun_max = gt_center_list.shape[:2]
     lang_num = data_dict["lang_num"]
+
     max_iou_rate_25 = 0
     max_iou_rate_5 = 0
 
@@ -285,7 +293,6 @@ def compute_reference_loss(data_dict, config, no_reference=False):
         labels = np.zeros((len_nun_max, num_proposals))
         for j in range(len_nun_max):
             if j < lang_num[i]:
-
 
                 # convert the bbox parameters to bbox corners
                 pred_obb_batch = config.param2obb_batch(pred_center[i, :, 0:3], pred_heading_class[i],

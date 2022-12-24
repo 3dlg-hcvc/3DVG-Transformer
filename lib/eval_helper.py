@@ -76,7 +76,11 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
         label_masks = (objectness_labels_batch == 1).float()
 
     #print("pred_masks", pred_masks.shape, label_masks.shape)
-    batch_size, len_nun_max = data_dict['ref_center_label_list'].shape[:2]
+
+
+    gt_center_list = torch.einsum("abc,adb->adc", data_dict["center_label"], data_dict["ref_box_label_list"].to(torch.float32))
+
+    batch_size, len_nun_max = gt_center_list.shape[:2]
     cluster_preds = torch.argmax(data_dict["cluster_ref"], 1).long().unsqueeze(1).repeat(1,pred_masks.shape[1])
 
 
