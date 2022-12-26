@@ -344,6 +344,8 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                     iou_matrix = np.zeros(shape=(gt_bbox_batch.shape[0], gt_bbox_batch.shape[0]))
                     for gt_bbox in gt_bbox_batch:
                         ious = box3d_iou_batch(pred_bbox_batch, np.tile(gt_bbox, (num_proposals, 1, 1)))
+                        if data_dict["istrain"][0] == 1 and not no_reference and data_dict["random"] < 0.5:
+                            ious = ious * objectness_masks[i]
                         if SCANREFER_ENHANCE_VANILLE:
                             filtered_ious_indices = np.where(ious >= 0.25)
                             if filtered_ious_indices[0].shape[0] == 0:
