@@ -7,8 +7,10 @@ import sys
 import os
 
 sys.path.append(os.path.join(os.getcwd(), os.pardir, "lib")) # HACK add the lib folder
-from lib.config import CONF
-from utils.box_util import get_3d_box
+try:
+    from lib.config import CONF
+except Exception as e:
+    from lib.configs.config import CONFfrom utils.box_util import get_3d_box
 
 def in_hull(p, hull):
     from scipy.spatial import Delaunay
