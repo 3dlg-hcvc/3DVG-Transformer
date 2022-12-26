@@ -8,7 +8,7 @@ import torch.nn as nn
 import numpy as np
 import sys
 import os
-
+from scipy.optimize import linear_sum_assignment
 from utils.nn_distance import nn_distance, huber_loss
 from lib.ap_helper import parse_predictions
 from lib.loss import SoftmaxRankingLoss, SoftmaxRankingLoss2
@@ -20,7 +20,8 @@ NEAR_THRESHOLD = 0.3
 GT_VOTE_FACTOR = 3  # number of GT votes per point
 OBJECTNESS_CLS_WEIGHTS = [0.2, 0.8]  # put larger weights on positive objectness
 
-SCANREFER_ENHANCE = False
+SCANREFER_ENHANCE = True
+SCANREFER_ENHANCE_VANILLE = True
 
 def compute_vote_loss(data_dict):
     """ Compute vote loss: Match predicted votes to GT votes.
@@ -249,21 +250,33 @@ def compute_reference_loss(data_dict, config, no_reference=False):
 
 
     # update
-    box_mask = data_dict["ref_box_label_list"].to(torch.float32)
-    gt_center_list = torch.einsum("abc,adb->adc", data_dict["center_label"], box_mask).cpu().numpy()
-    gt_size_class_list = torch.einsum("ab,acb->ac", data_dict["size_class_label"].to(torch.float32), box_mask).to(torch.long).cpu().numpy()
-    gt_size_residual_list = torch.einsum("abc,adb->adc", data_dict["size_residual_label"], box_mask).cpu().numpy()
+    if not SCANREFER_ENHANCE:
+        box_mask = data_dict["ref_box_label_list"].to(torch.float32)
+        gt_center_list = torch.einsum("abc,adb->adc", data_dict["center_label"], box_mask).cpu().numpy()
+        gt_size_class_list = torch.einsum("ab,acb->ac", data_dict["size_class_label"].to(torch.float32), box_mask).to(torch.long).cpu().numpy()
+        gt_size_residual_list = torch.einsum("abc,adb->adc", data_dict["size_residual_label"], box_mask).cpu().numpy()
+        gt_heading_class_list = torch.einsum("ab,acb->ac", data_dict["heading_class_label"].to(torch.float32), box_mask).to(torch.long).cpu().numpy()
+        gt_heading_residual_list = torch.einsum("ab,acb->ac", data_dict["heading_residual_label"].to(torch.float32), box_mask).to(torch.long).cpu().numpy()
+    else:
+        box_mask = data_dict["multi_ref_box_label_list"]
+        gt_box_num = data_dict["gt_box_num_list"].cpu().numpy()
+        # gt_center_list = torch.einsum("abc,adb->adc", data_dict["center_label"], box_mask).cpu().numpy()
+        # gt_size_class_list = torch.einsum("ab,acb->ac", data_dict["size_class_label"].to(torch.float32), box_mask).to(
+        #     torch.long).cpu().numpy()
+        # gt_size_residual_list = torch.einsum("abc,adb->adc", data_dict["size_residual_label"], box_mask).cpu().numpy()
+
+
 
 
     # gt_center_list = data_dict['ref_center_label_list'].cpu().numpy()  # (B,3)
 
-    gt_heading_class_list = data_dict['ref_heading_class_label_list'].cpu().numpy()  # B
-    gt_heading_residual_list = data_dict['ref_heading_residual_label_list'].cpu().numpy()  # B
+    # gt_heading_class_list = data_dict['ref_heading_class_label_list'].cpu().numpy()  # B
+    # gt_heading_residual_list = data_dict['ref_heading_residual_label_list'].cpu().numpy()  # B
     # gt_size_class_list = data_dict['ref_size_class_label_list'].cpu().numpy()  # B
     # gt_size_residual_list = data_dict['ref_size_residual_label_list'].cpu().numpy()  # B,3
     # convert gt bbox parameters to bbox corners
     batch_size, num_proposals = data_dict['aggregated_vote_features'].shape[:2]
-    batch_size, len_nun_max = gt_center_list.shape[:2]
+    batch_size, len_nun_max = data_dict["multi_ref_box_label_list"].shape[:2]
     lang_num = data_dict["lang_num"]
 
     max_iou_rate_25 = 0
@@ -275,23 +288,27 @@ def compute_reference_loss(data_dict, config, no_reference=False):
         cluster_preds = torch.zeros(batch_size, len_nun_max, num_proposals).cuda()
 
     # print("cluster_preds",cluster_preds.shape)
-    criterion = SoftmaxRankingLoss()
+    if not SCANREFER_ENHANCE:
+        criterion = SoftmaxRankingLoss()
+    else:
+        criterion = nn.MultiLabelSoftMarginLoss()
 
-    # scanrefer++
-    # criterion = nn.MultiLabelSoftMarginLoss()
-    # end
 
 
     loss = 0.
     gt_labels = np.zeros((batch_size, len_nun_max, num_proposals))
+
     for i in range(batch_size):
+
         objectness_masks = data_dict['objectness_scores'].max(2)[1].float().cpu().numpy() # batch_size, num_proposals
-        gt_obb_batch = config.param2obb_batch(gt_center_list[i][:, 0:3], gt_heading_class_list[i],
-                                              gt_heading_residual_list[i],
-                                              gt_size_class_list[i], gt_size_residual_list[i])
-        gt_bbox_batch = get_3d_box_batch(gt_obb_batch[:, 3:6], gt_obb_batch[:, 6], gt_obb_batch[:, 0:3])
+        if not SCANREFER_ENHANCE:
+            gt_obb_batch = config.param2obb_batch(gt_center_list[i][:, 0:3], gt_heading_class_list[i],
+                                                  gt_heading_residual_list[i],
+                                                  gt_size_class_list[i], gt_size_residual_list[i])
+            gt_bbox_batch = get_3d_box_batch(gt_obb_batch[:, 3:6], gt_obb_batch[:, 6], gt_obb_batch[:, 0:3])
         labels = np.zeros((len_nun_max, num_proposals))
         for j in range(len_nun_max):
+
             if j < lang_num[i]:
 
                 # convert the bbox parameters to bbox corners
@@ -299,25 +316,58 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                                                         pred_heading_residual[i],
                                                         pred_size_class[i], pred_size_residual[i])
                 pred_bbox_batch = get_3d_box_batch(pred_obb_batch[:, 3:6], pred_obb_batch[:, 6], pred_obb_batch[:, 0:3])
-                ious = box3d_iou_batch(pred_bbox_batch, np.tile(gt_bbox_batch[j], (num_proposals, 1, 1)))
+                if not SCANREFER_ENHANCE:
+                    ious = box3d_iou_batch(pred_bbox_batch, np.tile(gt_bbox_batch[j], (num_proposals, 1, 1)))
+                    if data_dict["istrain"][0] == 1 and not no_reference and data_dict["random"] < 0.5:
+                        ious = ious * objectness_masks[i]
+                    ious_ind = ious.argmax()
+                    max_ious = ious[ious_ind]
+                    if max_ious >= 0.25:
+                        labels[j, ious_ind] = 1  # treat the bbox with highest iou score as the gt
+                        max_iou_rate_25 += 1
+                    if max_ious >= 0.5:
+                        max_iou_rate_5 += 1
+                else:
+                    single_box_mask = box_mask[i][j]
+                    if single_box_mask.sum() == 0:
+                        continue
+                    gt_bboxes_centers = data_dict["center_label"][i][single_box_mask].cpu().numpy()
+                    gt_heading_class_labels = data_dict["heading_class_label"][i][single_box_mask].cpu().numpy()
+                    gt_heading_residual_labels = data_dict["heading_residual_label"][i][single_box_mask].cpu().numpy()
+                    gt_size_class_labels = data_dict["size_class_label"][i][single_box_mask].cpu().numpy()
+                    gt_bboxes_residuals = data_dict["size_residual_label"][i][single_box_mask].cpu().numpy()
 
-                if data_dict["istrain"][0] == 1 and not no_reference and data_dict["random"] < 0.5:
-                    ious = ious * objectness_masks[i]
+                    gt_obb_batch = config.param2obb_batch(gt_bboxes_centers[:, 0:3], gt_heading_class_labels,
+                                           gt_heading_residual_labels,
+                                           gt_size_class_labels, gt_bboxes_residuals)
+                    gt_bbox_batch = get_3d_box_batch(gt_obb_batch[:, 3:6], gt_obb_batch[:, 6], gt_obb_batch[:, 0:3])
+                    iou_matrix = np.zeros(shape=(gt_bbox_batch.shape[0], gt_bbox_batch.shape[0]))
+                    for gt_bbox in gt_bbox_batch:
+                        ious = box3d_iou_batch(pred_bbox_batch, np.tile(gt_bbox, (num_proposals, 1, 1)))
+                        if SCANREFER_ENHANCE_VANILLE:
+                            filtered_ious_indices = np.where(ious >= 0.25)
+                            if filtered_ious_indices[0].shape[0] == 0:
+                                continue
+                            labels[j, filtered_ious_indices] = 1
+
+
+
+                        # if filtered_ious.shape[0] < gt_bbox_batch.shape[0]:
+                        #     filtered_ious = np.pad(filtered_ious, (0, gt_bbox_batch.shape[0] - filtered_ious.shape[0]), "constant", constant_values=0)
+                        # iou_matrix[i] = filtered_ious[np.argpartition(filtered_ious, -gt_bbox_batch.shape[0])[-gt_bbox_batch.shape[0]:]]
+                        # # do Hungarian matching
+                        # row_idx, col_idx = linear_sum_assignment(iou_matrix)
+
+
 
                 ## scanrefer++ support
-                if SCANREFER_ENHANCE:
-                    # TODO do multi ious calculations
-                    gt_boxes_num = data_dict["multi_ref_box_label_list"][i][j].sum()
-                    # pick the top k ious
-                    ious_indices = torch.topk(ious, gt_boxes_num).indices
+                # if SCANREFER_ENHANCE:
+                #     # TODO do multi ious calculations
+                #     gt_boxes_num = data_dict["multi_ref_box_label_list"][i][j].sum()
+                #     # pick the top k ious
+                #     ious_indices = torch.topk(ious, gt_boxes_num).indices
 
-                ious_ind = ious.argmax()
-                max_ious = ious[ious_ind]
-                if max_ious >= 0.25:
-                    labels[j, ious.argmax()] = 1  # treat the bbox with highest iou score as the gt
-                    max_iou_rate_25 += 1
-                if max_ious >= 0.5:
-                    max_iou_rate_5 += 1
+
 
         cluster_labels = torch.FloatTensor(labels).cuda()  # B proposals
         gt_labels[i] = labels

@@ -30,7 +30,7 @@ SCANNET_V2_TSV = os.path.join(CONF.PATH.SCANNET_META, "scannetv2-labels.combined
 MULTIVIEW_DATA = CONF.MULTIVIEW
 GLOVE_PICKLE = os.path.join(CONF.PATH.DATA, "glove.p")
 
-SCANREFER_ENHANCE = False
+SCANREFER_ENHANCE = True
 
 class ScannetReferenceDataset(Dataset):
        
@@ -233,10 +233,14 @@ class ScannetReferenceDataset(Dataset):
         ref_heading_class_label_list = []
         ref_heading_residual_label_list = []
         # ref_size_class_label_list = []
-        ref_size_residual_label_list = []
+        # ref_size_residual_label_list = []
 
 
         multi_ref_box_label_list = []
+
+        # scanrefer++
+        gt_box_num_list = []
+        # end
 
         if self.split != "test":
             num_bbox = instance_bboxes.shape[0] if instance_bboxes.shape[0] < MAX_NUM_OBJ else MAX_NUM_OBJ
@@ -322,10 +326,12 @@ class ScannetReferenceDataset(Dataset):
                 multi_ref_box_label = np.zeros(MAX_NUM_OBJ, dtype=bool)
                 # end
 
-                if object_id_list[j] == -1:
+                if object_id_list[j] == -1 and SCANREFER_ENHANCE:
                     ref_box_label_list.append(ref_box_label)
                     ref_heading_class_label_list.append(angle_classes[i])
                     ref_heading_residual_label_list.append(angle_residuals[i])
+                    gt_box_num_list.append(len(multi_obj_ids_list[j]))
+                    multi_ref_box_label_list.append(multi_ref_box_label)
                     continue
 
                 for i, gt_id in enumerate(instance_bboxes[:num_bbox, -1]):
@@ -346,9 +352,13 @@ class ScannetReferenceDataset(Dataset):
                         # ref_size_residual_label_list.append(ref_size_residual_label)
 
                     if SCANREFER_ENHANCE:
+
                         if gt_id in multi_obj_ids_list[j]:
                             multi_ref_box_label[i] = True
-                multi_ref_box_label_list.append(multi_ref_box_label)
+                if SCANREFER_ENHANCE:
+                    gt_box_num_list.append(len(multi_obj_ids_list[j]))
+                    multi_ref_box_label_list.append(multi_ref_box_label)
+
             #ref_center_label_lists = np.array(ref_center_label_list).astype(np.float32)
             #print("ref_center_label",ref_center_label.shape,ref_center_label_lists.shape)
 
@@ -412,9 +422,11 @@ class ScannetReferenceDataset(Dataset):
         data_dict["object_id"] = np.array(object_id_list).astype(np.int64)
         data_dict["ann_id"] = np.array(ann_id_list).astype(np.int64)
 
+        data_dict["gt_box_num_list"] = np.array(gt_box_num_list).astype(np.int32)
 
         if SCANREFER_ENHANCE:
             data_dict["multi_ref_box_label_list"] = np.array(multi_ref_box_label_list)
+
 
         unique_multiple_list = []
         for i in range(self.lang_num_max):
