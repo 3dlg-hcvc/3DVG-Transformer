@@ -414,8 +414,8 @@ class ScannetReferenceDataset(Dataset):
         # data_dict["unk_list"] = np.array(unk_list).astype(np.float32)
         data_dict["ref_box_label_list"] = np.array(ref_box_label_list).astype(bool)  # 0/1 reference labels for each object bbox
         # data_dict["ref_center_label_list"] = np.array(ref_center_label_list).astype(np.float32)
-        data_dict["ref_heading_class_label_list"] = np.array(ref_heading_class_label_list).astype(np.int64)
-        data_dict["ref_heading_residual_label_list"] = np.array(ref_heading_residual_label_list).astype(np.int64)
+        # data_dict["ref_heading_class_label_list"] = np.array(ref_heading_class_label_list).astype(np.int64)
+        # data_dict["ref_heading_residual_label_list"] = np.array(ref_heading_residual_label_list).astype(np.int64)
         # data_dict["ref_size_class_label_list"] = np.array(ref_size_class_label_list).astype(np.int64)
         # data_dict["ref_size_residual_label_list"] = np.array(ref_size_residual_label_list).astype(np.float32)
         data_dict["object_cat_list"] = np.array(object_cat_list).astype(np.int64)
