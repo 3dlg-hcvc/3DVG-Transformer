@@ -209,7 +209,8 @@ def get_scanrefer(scanrefer_train, scanrefer_val, num_scenes, lang_num_max):
             data["scene_id"] = scene_id
             new_scanrefer_val.append(data)
     else:
-        scanrefer_train.sort(key=lambda x: x["scene_id"])
+        scanrefer_train.sort(key=lambda x: (x["scene_id"], x["object_id"], x["ann_id"]))
+        scanrefer_val.sort(key=lambda x: (x["scene_id"], x["object_id"], x["ann_id"]))
         # get initial scene list
         train_scene_list = sorted(list(set([data["scene_id"] for data in scanrefer_train])))
         val_scene_list = sorted(list(set([data["scene_id"] for data in scanrefer_val])))
