@@ -104,7 +104,7 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
 
     # # scanrefer++ support, use threshold to filter predictions instead of argmax
     if SCANREFER_PLUS_PLUS:
-        pred_ref_mul_obj_mask = (data_dict["cluster_ref"] * pred_masks) > 0.7
+        pred_ref_mul_obj_mask = torch.logical_and((torch.sigmoid(data_dict["cluster_ref"]) >= 0.3), pred_masks.bool())
     # # end
 
     # compute localization metricens
