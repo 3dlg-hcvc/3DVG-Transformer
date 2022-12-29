@@ -4,10 +4,8 @@ Author: Dave Zhenyu Chen (zhenyu.chen@tum.de)
 '''
 
 import os
-import sys
 import time
 import h5py
-import json
 import pickle
 import numpy as np
 import multiprocessing as mp
@@ -16,7 +14,7 @@ import torch.multiprocessing
 torch.multiprocessing.set_sharing_strategy('file_system')
 from lib.config import CONF
 from utils.pc_utils import random_sampling, rotx, roty, rotz
-from data.scannet.model_util_scannet import rotate_aligned_boxes, ScannetDatasetConfig, rotate_aligned_boxes_along_axis
+from data.scannet.model_util_scannet import ScannetDatasetConfig, rotate_aligned_boxes_along_axis
 import random
 
 # data setting
@@ -48,6 +46,7 @@ class ScannetReferenceDataset(Dataset):
         self.scanrefer = scanrefer
         self.scanrefer_new = scanrefer_new
         self.scanrefer_new_len = len(scanrefer_new)
+
         self.scanrefer_all_scene = scanrefer_all_scene # all scene_ids in scanrefer
         self.split = split
         self.num_points = num_points
@@ -126,7 +125,7 @@ class ScannetReferenceDataset(Dataset):
 
         #print("idx", idx)
         lang_num = len(self.scanrefer_new[idx])
-        #print("lang_num", lang_num)
+
         scene_id = self.scanrefer_new[idx][0]["scene_id"]
 
         object_id_list = []
@@ -338,7 +337,7 @@ class ScannetReferenceDataset(Dataset):
                     if gt_id == object_id_list[j]:
 
 
-                        ref_box_label[i] = True
+                        ref_box_label[i] = 1
                         # ref_center_label = target_bboxes[i, 0:3]
 
                         # ref_size_class_label = size_classes[i]

@@ -6,13 +6,10 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import sys
-import os
 from scipy.optimize import linear_sum_assignment
 from utils.nn_distance import nn_distance, huber_loss
-from lib.ap_helper import parse_predictions
 from lib.loss import SoftmaxRankingLoss, SoftmaxRankingLoss2
-from utils.box_util import get_3d_box, get_3d_box_batch, box3d_iou, box3d_iou_batch
+from utils.box_util import get_3d_box_batch, box3d_iou_batch
 
 # FAR_THRESHOLD = 0.6
 FAR_THRESHOLD = 0.3
@@ -276,7 +273,10 @@ def compute_reference_loss(data_dict, config, no_reference=False):
     # gt_size_residual_list = data_dict['ref_size_residual_label_list'].cpu().numpy()  # B,3
     # convert gt bbox parameters to bbox corners
     batch_size, num_proposals = data_dict['aggregated_vote_features'].shape[:2]
-    batch_size, len_nun_max = data_dict["multi_ref_box_label_list"].shape[:2]
+    if SCANREFER_ENHANCE:
+        batch_size, len_nun_max = data_dict["multi_ref_box_label_list"].shape[:2]
+    else:
+        batch_size, len_nun_max = gt_center_list.shape[:2]
     lang_num = data_dict["lang_num"]
 
     max_iou_rate_25 = 0

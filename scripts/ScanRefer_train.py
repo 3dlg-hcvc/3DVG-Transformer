@@ -1,14 +1,10 @@
 import os
 import sys
 import json
-import h5py
 import argparse
-import importlib
 import torch
-import torch.optim as optim
-import torch.nn as nn
+
 import numpy as np
-import pickle
 
 from torch.utils.data import DataLoader
 from datetime import datetime
@@ -48,7 +44,7 @@ def get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, split, config
         shuffle=shuffle
     )
     # dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle, num_workers=4)
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle, num_workers=4, pin_memory=True)
 
     return dataset, dataloader
 
@@ -213,6 +209,7 @@ def get_scanrefer(scanrefer_train, scanrefer_val, num_scenes, lang_num_max):
             data["scene_id"] = scene_id
             new_scanrefer_val.append(data)
     else:
+        scanrefer_train.sort(key=lambda x: x["scene_id"])
         # get initial scene list
         train_scene_list = sorted(list(set([data["scene_id"] for data in scanrefer_train])))
         val_scene_list = sorted(list(set([data["scene_id"] for data in scanrefer_val])))
