@@ -385,7 +385,6 @@ class Solver():
                 "max_iou_rate_0.5": 0,
                 "scanrefer++_overall_25": 0,
                 "scanrefer++_overall_50": 0
-
             }
 
             # load
@@ -463,11 +462,8 @@ class Solver():
 
             all_preds, all_gts = load_gt_and_pred_jsons_from_disk("scanrefer++_test", "3dvg_gt")
             iou_25_results, iou_50_results = evaluate_all_scenes(all_preds, all_gts)
-
             self.log[phase]["scanrefer++_overall_25"] = iou_25_results["overall"]
             self.log[phase]["scanrefer++_overall_50"] = iou_50_results["overall"]
-
-
 
 
         # check best

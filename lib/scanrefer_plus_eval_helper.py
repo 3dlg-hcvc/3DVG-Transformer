@@ -93,8 +93,6 @@ def evaluate_one_query(pred_info, gt_info):
 def evaluate_all_scenes(all_pred_info, all_gt_info, scenes_info=None):
     all_gt_info_len = len(all_gt_info)
 
-    #assert len(all_pred_info) == all_gt_info_len
-
 
     eval_type_mask = np.zeros(all_gt_info_len, dtype=np.uint8)
     # sem_label_class_mask = np.zeros(all_gt_info_len, dtype=np.uint16)

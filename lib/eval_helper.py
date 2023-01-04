@@ -251,8 +251,8 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
                         pred_bbox = construct_bbox_corners(pred_obb[0:3], pred_obb[3:6])
                         multi_pred_bboxes.append(pred_bbox)
                     output_info = {
-                        "object_id": data_dict["object_id"].flatten()[i].item(),
-                        "ann_id": data_dict["ann_id"].flatten()[i].item(),
+                        "object_id": data_dict["object_id"][i][j].item(),
+                        "ann_id": data_dict["ann_id"][i][j].item(),
                         "aabbs": multi_pred_bboxes
                     }
                     scene_id = data_dict["scene_id"][i]
