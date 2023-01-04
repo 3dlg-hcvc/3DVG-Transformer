@@ -341,12 +341,12 @@ if __name__ == "__main__":
 
     # setting
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+    # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
     # reproducibility
     torch.manual_seed(args.seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    # torch.backends.cudnn.deterministic = False
+    # torch.backends.cudnn.benchmark = False
     np.random.seed(args.seed)
 
     train(args)
