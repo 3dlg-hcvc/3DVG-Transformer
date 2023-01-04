@@ -4,13 +4,14 @@ Author: Dave Zhenyu Chen (zhenyu.chen@tum.de)
 '''
 
 import os
-import sys
+import json
 import time
 import torch
 import numpy as np
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 from torch.optim.lr_scheduler import StepLR, MultiStepLR, CosineAnnealingLR
+from lib.scanrefer_plus_eval_helper import *
 
 from lib.config import CONF
 from lib.loss_helper import get_loss
@@ -18,6 +19,7 @@ from lib.eval_helper import get_eval
 from utils.eta import decode_eta
 from lib.pointnet2.pytorch_utils import BNMomentumScheduler
 
+SCANREFER_PLUS_PLUS = True
 
 ITER_REPORT_TEMPLATE = """
 -------------------------------iter: [{epoch_id}: {iter_id}/{total_iter}]-------------------------------
@@ -83,6 +85,7 @@ BEST_REPORT_TEMPLATE = """
 [sco.] obj_acc: {obj_acc}
 [sco.] pos_ratio: {pos_ratio}, neg_ratio: {neg_ratio}
 [sco.] iou_rate_0.25: {iou_rate_25}, iou_rate_0.5: {iou_rate_5}
+[sco.] scanrefer++_overall_25: {scanrefer++_overall_25}, scanrefer++_overall_50: {scanrefer++_overall_50}
 """
 
 class Solver():
@@ -125,7 +128,9 @@ class Solver():
             "iou_rate_0.25": -float("inf"),
             "iou_rate_0.5": -float("inf"),
             "max_iou_rate_0.25": -float("inf"),
-            "max_iou_rate_0.5": -float("inf")
+            "max_iou_rate_0.5": -float("inf"),
+            "scanrefer++_overall_25": -float("inf"),
+            "scanrefer++_overall_50": -float("inf"),
         }
 
         # init log
@@ -271,7 +276,9 @@ class Solver():
             "iou_rate_0.25": [],
             "iou_rate_0.5": [],
             "max_iou_rate_0.25": [],
-            "max_iou_rate_0.5": []
+            "max_iou_rate_0.5": [],
+            "scanrefer++_overall_25": 0,
+            "scanrefer++_overall_50": 0
         }
 
     def _set_phase(self, phase):
@@ -310,12 +317,14 @@ class Solver():
         self._running_log["box_loss"] = data_dict["box_loss"]
         self._running_log["loss"] = data_dict["loss"]
 
-    def _eval(self, data_dict):
+    def _eval(self, data_dict, mem_hash=None, final_output=None):
         data_dict = get_eval(
             data_dict=data_dict,
             config=self.config,
             reference=self.reference,
-            use_lang_classifier=self.use_lang_classifier
+            use_lang_classifier=self.use_lang_classifier,
+            mem_hash=mem_hash,
+            final_output=final_output
         )
 
         # dump
@@ -339,11 +348,21 @@ class Solver():
         # change dataloader
         dataloader = dataloader if phase == "train" else tqdm(dataloader)
 
+        if SCANREFER_PLUS_PLUS:
+            final_output = {}
+            mem_hash = {}
+
         for data_dict in dataloader:
             # move to cuda
             for key in data_dict:
                 if key != "scene_id":
                     data_dict[key] = data_dict[key].cuda()
+
+            # scanrefer++ support
+            if SCANREFER_PLUS_PLUS:
+                for scene_id in data_dict["scene_id"]:
+                    if scene_id not in final_output:
+                        final_output[scene_id] = []
 
             # initialize the running loss
             self._running_log = {
@@ -363,7 +382,10 @@ class Solver():
                 "iou_rate_0.25": 0,
                 "iou_rate_0.5": 0,
                 "max_iou_rate_0.25": 0,
-                "max_iou_rate_0.5": 0
+                "max_iou_rate_0.5": 0,
+                "scanrefer++_overall_25": 0,
+                "scanrefer++_overall_50": 0
+
             }
 
             # load
@@ -385,7 +407,7 @@ class Solver():
             
             # eval
             start = time.time()
-            self._eval(data_dict)
+            self._eval(data_dict, mem_hash=mem_hash, final_output=final_output)
             self.log[phase]["eval"].append(time.time() - start)
 
             # record log
@@ -430,11 +452,28 @@ class Solver():
                     self._dump_log("train")
                 self._global_iter_id += 1
 
+        # scanrefer+= support
+        if SCANREFER_PLUS_PLUS and phase == "val":
+            for key, value in final_output.items():
+                for query in value:
+                    query["aabbs"] = [item.tolist() for item in query["aabbs"]]
+                os.makedirs("scanrefer++_test", exist_ok=True)
+                with open(f"scanrefer++_test/{key}.json", "w") as f:
+                    json.dump(value, f)
+
+            all_preds, all_gts = load_gt_and_pred_jsons_from_disk("scanrefer++_test", "3dvg_gt")
+            iou_25_results, iou_50_results = evaluate_all_scenes(all_preds, all_gts)
+
+            self.log[phase]["scanrefer++_overall_25"] = iou_25_results["overall"]
+            self.log[phase]["scanrefer++_overall_50"] = iou_50_results["overall"]
+
+
+
 
         # check best
         if phase == "val":
-            cur_criterion = "iou_rate_0.5"
-            cur_criterion_25 = "iou_rate_0.25"
+            cur_criterion = "scanrefer++_overall_50"
+            cur_criterion_25 = "scanrefer++_overall_25"
             cur_best = np.mean(self.log[phase][cur_criterion])
             cur_best_25 = np.mean(self.log[phase][cur_criterion_25])
             if cur_best + cur_best_25 > self.best[cur_criterion] + self.best[cur_criterion_25]:
@@ -456,6 +495,8 @@ class Solver():
                 self.best["neg_ratio"] = np.mean(self.log[phase]["neg_ratio"])
                 self.best["iou_rate_0.25"] = np.mean(self.log[phase]["iou_rate_0.25"])
                 self.best["iou_rate_0.5"] = np.mean(self.log[phase]["iou_rate_0.5"])
+                self.best["scanrefer++_overall_25"] = self.log[phase]["scanrefer++_overall_25"]
+                self.best["scanrefer++_overall_50"] = self.log[phase]["scanrefer++_overall_50"]
 
                 # save model
                 self._log("saving best models...\n")
@@ -467,21 +508,30 @@ class Solver():
             if det_cur_best > self.best[det_cur_criterion]:
                 self.best["max_iou_rate_0.25"] = np.mean(self.log[phase]["max_iou_rate_0.25"])
                 self.best["max_iou_rate_0.5"] = np.mean(self.log[phase]["max_iou_rate_0.5"])
+                self.best["scanrefer++_overall_25"] = self.log[phase]["scanrefer++_overall_25"]
+                self.best["scanrefer++_overall_50"] = self.log[phase]["scanrefer++_overall_50"]
                 model_root = os.path.join(CONF.PATH.OUTPUT, self.stamp)
                 torch.save(self.model.state_dict(), os.path.join(model_root, "model_last.pth"))
 
     def _dump_log(self, phase):
         log = {
             "loss": ["loss", "ref_loss", "lang_loss", "objectness_loss", "vote_loss", "box_loss"],
-            "score": ["lang_acc", "ref_acc", "obj_acc", "pos_ratio", "neg_ratio", "iou_rate_0.25", "iou_rate_0.5", "max_iou_rate_0.25", "max_iou_rate_0.5"]
+            "score": ["lang_acc", "ref_acc", "obj_acc", "pos_ratio", "neg_ratio", "iou_rate_0.25", "iou_rate_0.5", "max_iou_rate_0.25", "max_iou_rate_0.5", "scanrefer++_overall_25", "scanrefer++_overall_50"]
         }
         for key in log:
             for item in log[key]:
-                self._log_writer[phase].add_scalar(
-                    "{}/{}".format(key, item),
-                    np.mean([v for v in self.log[phase][item]]),
-                    self._global_iter_id
-                )
+                if item in ("scanrefer++_overall_25", "scanrefer++_overall_50"):
+                    self._log_writer[phase].add_scalar(
+                        "{}/{}".format(key, item),
+                        self.log[phase][item],
+                        self._global_iter_id
+                    )
+                else:
+                    self._log_writer[phase].add_scalar(
+                        "{}/{}".format(key, item),
+                        np.mean([v for v in self.log[phase][item]]),
+                        self._global_iter_id
+                    )
 
     def _finish(self, epoch_id):
         # print best

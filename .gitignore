@@ -35,3 +35,7 @@ ignore/
 
 */*/tensorboard/*
 *.swp
+
+data
+
+scanrefer++_test
