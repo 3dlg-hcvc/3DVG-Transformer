@@ -112,9 +112,6 @@ def evaluate_all_scenes(all_pred_info, all_gt_info, scenes_info=None):
     iou_25_overall_overall_count = []
     iou_50_overall_overall_count = []
 
-
-
-
     for sub_group in EVALUATION_TYPES.values():
 
         selected_indices = eval_type_mask == sub_group

@@ -10,6 +10,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from copy import deepcopy
+from lib.scanrefer_plus_eval_helper import *
 
 sys.path.append(os.path.join(os.getcwd())) # HACK add the root folder
 
@@ -157,15 +158,14 @@ def eval_ref(args):
         for seed in seeds:
             # reproducibility
             torch.manual_seed(seed)
-            torch.backends.cudnn.deterministic = True
-            torch.backends.cudnn.benchmark = False
+            # torch.backends.cudnn.deterministic = True
+            # torch.backends.cudnn.benchmark = False
             np.random.seed(seed)
 
             # scanrefer++ support
             if SCANREFER_PLUS_PLUS:
                 final_output = {}
                 mem_hash = {}
-
 
             print("generating the scores for seed {}...".format(seed))
             ref_acc = []
@@ -250,8 +250,11 @@ def eval_ref(args):
                     os.makedirs("scanrefer++_test", exist_ok=True)
                     with open(f"scanrefer++_test/{key}.json", "w") as f:
                         json.dump(value, f)
-            # end
 
+                all_preds, all_gts = load_gt_and_pred_jsons_from_disk("scanrefer++_test", "3dvg_gt")
+                iou_25_results, iou_50_results = evaluate_all_scenes(all_preds, all_gts)
+                print_evaluation_results("F1-scores", iou_25_results, iou_50_results)
+            # end
             # save to global
             ref_acc_all.append(ref_acc)
             ious_all.append(ious)
@@ -503,7 +506,7 @@ if __name__ == "__main__":
     parser.add_argument("--detection", action="store_true", help="evaluate the object detection results")
     args = parser.parse_args()
 
-    assert args.lang_num_max == 1, 'lang max num == 1; avoid bugs'
+    #assert args.lang_num_max == 1, 'lang max num == 1; avoid bugs'
     # setting
     # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"

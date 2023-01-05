@@ -87,7 +87,6 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
 
 
 
-
     preds = torch.zeros(data_dict["cluster_ref"].shape).cuda()
     preds = preds.scatter_(1, cluster_preds, 1)
     cluster_preds = preds
@@ -106,6 +105,7 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
     # # scanrefer++ support, use threshold to filter predictions instead of argmax
     if SCANREFER_PLUS_PLUS:
         pred_ref_mul_obj_mask = torch.logical_and((torch.sigmoid(data_dict["cluster_ref"]) >= 0.4), pred_masks.bool().repeat(1, len_nun_max).reshape(batch_size*len_nun_max, -1))
+
         # pred_ref_mul_obj_mask = torch.logical_and((torch.nn.functional.softmax(data_dict["cluster_ref"], dim=1) >= 0.3), pred_masks.bool())
     # # end
 
@@ -198,6 +198,9 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
     gt_bboxes = []
     #print("pred_ref", pred_ref.shape, gt_ref.shape)
     pred_ref = pred_ref.reshape(batch_size, len_nun_max)
+
+    pred_ref_mul_obj_mask = pred_ref_mul_obj_mask.reshape(batch_size, len_nun_max, -1)
+
     for i in range(batch_size):
         # compute the iou
         for j in range(len_nun_max):
@@ -238,7 +241,7 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
                 # scanrefer++ support
                 if SCANREFER_PLUS_PLUS:
                     multi_pred_bboxes = []
-                    multi_pred_ref_idxs = pred_ref_mul_obj_mask[i].nonzero()
+                    multi_pred_ref_idxs = pred_ref_mul_obj_mask[i][j].nonzero()
                     for idx in multi_pred_ref_idxs:
                         pred_obb = config.param2obb(
                             pred_center[i, idx, 0:3].detach().cpu().numpy(),
