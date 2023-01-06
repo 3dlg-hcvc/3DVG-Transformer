@@ -10,7 +10,7 @@ from scipy.optimize import linear_sum_assignment
 from utils.nn_distance import nn_distance, huber_loss
 from lib.loss import SoftmaxRankingLoss, SoftmaxRankingLoss2
 from utils.box_util import get_3d_box_batch, box3d_iou_batch
-
+from scipy.optimize import linear_sum_assignment
 # FAR_THRESHOLD = 0.6
 FAR_THRESHOLD = 0.3
 NEAR_THRESHOLD = 0.3
@@ -18,7 +18,7 @@ GT_VOTE_FACTOR = 3  # number of GT votes per point
 OBJECTNESS_CLS_WEIGHTS = [0.2, 0.8]  # put larger weights on positive objectness
 
 SCANREFER_ENHANCE = True
-SCANREFER_ENHANCE_VANILLE = True
+SCANREFER_ENHANCE_VANILLE = False
 
 def compute_vote_loss(data_dict):
     """ Compute vote loss: Match predicted votes to GT votes.
@@ -294,8 +294,6 @@ def compute_reference_loss(data_dict, config, no_reference=False):
     else:
         criterion = nn.MultiLabelSoftMarginLoss()
 
-
-
     loss = 0.
     gt_labels = np.zeros((batch_size, len_nun_max, num_proposals))
 
@@ -342,16 +340,25 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                                            gt_heading_residual_labels,
                                            gt_size_class_labels, gt_bboxes_residuals)
                     gt_bbox_batch_new = get_3d_box_batch(gt_obb_batch_new[:, 3:6], gt_obb_batch_new[:, 6], gt_obb_batch_new[:, 0:3])
-                    iou_matrix = np.zeros(shape=(gt_bbox_batch_new.shape[0], gt_bbox_batch_new.shape[0]))
-                    for gt_bbox in gt_bbox_batch_new:
+                    iou_matrix = np.zeros(shape=(gt_bbox_batch_new.shape[0], ious.shape[0]))
+                    for k, gt_bbox in enumerate(gt_bbox_batch_new):
                         ious = box3d_iou_batch(pred_bbox_batch, np.tile(gt_bbox, (num_proposals, 1, 1)))
                         if data_dict["istrain"][0] == 1 and not no_reference and data_dict["random"] < 0.5:
                             ious = ious * objectness_masks[i]
+
+                        filtered_ious_indices = np.where(ious >= 0.25)[0]
+
                         if SCANREFER_ENHANCE_VANILLE:
-                            filtered_ious_indices = np.where(ious >= 0.25)
-                            if filtered_ious_indices[0].shape[0] == 0:
+                            if filtered_ious_indices.shape[0] == 0:
                                 continue
                             labels_new[j, filtered_ious_indices] = 1
+                        else:
+                            iou_matrix[k] = ious * -1
+                    row_idx, col_idx = linear_sum_assignment(iou_matrix)
+                    for index in range(len(row_idx)):
+                        if (iou_matrix[row_idx[index], col_idx[index]] * -1) >= 0.25:
+                            labels_new[j, col_idx[index]] = 1
+
 
 
 
