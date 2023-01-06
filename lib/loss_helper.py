@@ -345,18 +345,19 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                         if data_dict["istrain"][0] == 1 and not no_reference and data_dict["random"] < 0.5:
                             ious = ious * objectness_masks[i]
 
-                        filtered_ious_indices = np.where(ious >= 0.25)[0]
 
                         if SCANREFER_ENHANCE_VANILLE:
+                            filtered_ious_indices = np.where(ious >= 0.25)[0]
                             if filtered_ious_indices.shape[0] == 0:
                                 continue
                             labels_new[j, filtered_ious_indices] = 1
                         else:
                             iou_matrix[k] = ious * -1
-                    row_idx, col_idx = linear_sum_assignment(iou_matrix)
-                    for index in range(len(row_idx)):
-                        if (iou_matrix[row_idx[index], col_idx[index]] * -1) >= 0.25:
-                            labels_new[j, col_idx[index]] = 1
+                    if not SCANREFER_ENHANCE_VANILLE:
+                        row_idx, col_idx = linear_sum_assignment(iou_matrix)
+                        for index in range(len(row_idx)):
+                            if (iou_matrix[row_idx[index], col_idx[index]] * -1) >= 0.25:
+                                labels_new[j, col_idx[index]] = 1
 
 
 
