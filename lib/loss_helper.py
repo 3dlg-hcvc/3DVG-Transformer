@@ -6,7 +6,6 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from scipy.optimize import linear_sum_assignment
 from utils.nn_distance import nn_distance, huber_loss
 from lib.loss import SoftmaxRankingLoss, SoftmaxRankingLoss2
 from utils.box_util import get_3d_box_batch, box3d_iou_batch
