@@ -161,23 +161,28 @@ def print_evaluation_results(title, iou_25_results, iou_50_results):
     # hard code for statistics
     groups = {0: [], 1: [], 2: [], 3: [], "overall": []}
 
-    line_str = '{:<15}'.format("0.25")
+    line_1_str = '{:<15}'.format("0.25")
 
     for sub_group_type, score in iou_25_results.items():
-        line_str += '{:<15.3f}'.format(score)
+        line_1_str += '{:<15.3f}'.format(score)
         # hard code for statistics
         groups[sub_group_type].append(str(round(score, 3)))
-    print(line_str)
+    print(line_1_str)
 
-    line_str = '{:<15}'.format("0.50")
+    line_2_str = '{:<15}'.format("0.50")
 
     for sub_group_type, score in iou_50_results.items():
-        line_str += '{:<15.3f}'.format(score)
+        line_2_str += '{:<15.3f}'.format(score)
         # hard code for statistics
         groups[sub_group_type].append(str(round(score, 3)))
-    print(line_str)
+    print(line_2_str)
     print(f"{'=' * 82}\n")
+    import re
+    latex1 = re.sub(' +', ' & ', line_1_str[15:])
 
+    latex2 = re.sub(' +', ' & ', line_2_str[15:])
+
+    print(latex1 + latex2)
 
 def read_json_from_file(json_path):
     with open(json_path, 'r') as f:

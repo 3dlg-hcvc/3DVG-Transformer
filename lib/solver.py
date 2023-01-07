@@ -69,6 +69,7 @@ EPOCH_REPORT_TEMPLATE = """
 [val]   val_pos_ratio: {val_pos_ratio}, val_neg_ratio: {val_neg_ratio}
 [val]   val_iou_rate_0.25: {val_iou_rate_25}, val_iou_rate_0.5: {val_iou_rate_5}
 [val]   val_max_iou_rate_0.25: {val_max_iou_rate_25}, val_max_iou_rate_0.5: {val_max_iou_rate_5}
+[val]   scanrefer_plus_overall_25: {scanrefer++_overall_25}, scanrefer_plus_overall_50: {scanrefer++_overall_50},
 """
 
 BEST_REPORT_TEMPLATE = """
@@ -631,6 +632,8 @@ class Solver():
             val_iou_rate_5=round(np.mean([v for v in self.log["val"]["iou_rate_0.5"]]), 5),
             val_max_iou_rate_25=round(np.mean([v for v in self.log["val"]["max_iou_rate_0.25"]]), 5),
             val_max_iou_rate_5=round(np.mean([v for v in self.log["val"]["max_iou_rate_0.5"]]), 5),
+            scanrefer_plus_overall_25=self.log["val"]["scanrefer++_overall_25"],
+            scanrefer_plus_overall_50=self.log["val"]["scanrefer++_overall_50"],
         )
         self._log(epoch_report)
         self._log_eval(epoch_report)
