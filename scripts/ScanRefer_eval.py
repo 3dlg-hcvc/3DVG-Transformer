@@ -191,10 +191,10 @@ def eval_ref(args):
                 with torch.no_grad():
                     data = model(data)
                     _, data = get_loss(
-                        data_dict=data, 
-                        config=DC, 
+                        data_dict=data,
+                        config=DC,
                         detection=True,
-                        reference=True, 
+                        reference=True,
                         use_lang_classifier=not args.no_lang_cls
                     )
                     data = get_eval(
@@ -512,6 +512,9 @@ if __name__ == "__main__":
     # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
     # evaluate
-    if args.reference: eval_ref(args)
-    if args.detection: eval_det(args)
+
+    if args.reference:
+        eval_ref(args)
+    if args.detection:
+        eval_det(args)
 

@@ -360,25 +360,6 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                                 labels_new[j, col_idx[index]] = 1
 
 
-
-
-                        # if filtered_ious.shape[0] < gt_bbox_batch.shape[0]:
-                        #     filtered_ious = np.pad(filtered_ious, (0, gt_bbox_batch.shape[0] - filtered_ious.shape[0]), "constant", constant_values=0)
-                        # iou_matrix[i] = filtered_ious[np.argpartition(filtered_ious, -gt_bbox_batch.shape[0])[-gt_bbox_batch.shape[0]:]]
-                        # # do Hungarian matching
-                        # row_idx, col_idx = linear_sum_assignment(iou_matrix)
-
-
-
-                ## scanrefer++ support
-                # if SCANREFER_ENHANCE:
-                #     # TODO do multi ious calculations
-                #     gt_boxes_num = data_dict["multi_ref_box_label_list"][i][j].sum()
-                #     # pick the top k ious
-                #     ious_indices = torch.topk(ious, gt_boxes_num).indices
-
-
-
         cluster_labels = torch.FloatTensor(labels_new).cuda()  # B proposals
         gt_labels[i] = labels_new
         # reference loss
