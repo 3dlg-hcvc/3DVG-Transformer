@@ -102,8 +102,8 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
     data_dict["ref_acc"] = ref_acc.cpu().numpy().tolist()
 
     # # scanrefer++ support, use threshold to filter predictions instead of argmax
-    if SCANREFER_PLUS_PLUS:
-        pred_ref_mul_obj_mask = torch.logical_and((torch.sigmoid(data_dict["cluster_ref"]) >= 0.1), pred_masks.bool().repeat(1, len_nun_max).reshape(batch_size*len_nun_max, -1)).cpu().numpy()
+    if SCANREFER_ENHANCE:
+        pred_ref_mul_obj_mask = torch.logical_and((torch.sigmoid(data_dict["cluster_ref"]) >= SCANREFER_ENHANCE_EVAL_THRESHOLD), pred_masks.bool().repeat(1, len_nun_max).reshape(batch_size*len_nun_max, -1)).cpu().numpy()
 
         # pred_ref_mul_obj_mask = torch.logical_and((torch.nn.functional.softmax(data_dict["cluster_ref"], dim=1) >= 0.3), pred_masks.bool())
     # # end
@@ -238,7 +238,7 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
                 others.append(flag)
 
                 # scanrefer++ support
-                if SCANREFER_PLUS_PLUS:
+                if SCANREFER_ENHANCE:
                     multi_pred_bboxes = []
                     multi_pred_ref_idxs = pred_ref_mul_obj_mask[i][j].nonzero()
                     for idx in multi_pred_ref_idxs[0]:

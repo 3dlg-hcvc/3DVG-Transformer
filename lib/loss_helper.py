@@ -346,7 +346,7 @@ def compute_reference_loss(data_dict, config, no_reference=False):
 
 
                         if SCANREFER_ENHANCE_VANILLE:
-                            filtered_ious_indices = np.where(ious >= 0.25)[0]
+                            filtered_ious_indices = np.where(ious >= SCANREFER_ENHANCE_LOSS_THRESHOLD)[0]
                             if filtered_ious_indices.shape[0] == 0:
                                 continue
                             labels_new[j, filtered_ious_indices] = 1
@@ -355,7 +355,7 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                     if not SCANREFER_ENHANCE_VANILLE:
                         row_idx, col_idx = linear_sum_assignment(iou_matrix)
                         for index in range(len(row_idx)):
-                            if (iou_matrix[row_idx[index], col_idx[index]] * -1) >= 0.25:
+                            if (iou_matrix[row_idx[index], col_idx[index]] * -1) >= SCANREFER_ENHANCE_LOSS_THRESHOLD:
                                 labels_new[j, col_idx[index]] = 1
 
 

@@ -349,7 +349,7 @@ class Solver():
         # change dataloader
         dataloader = dataloader if phase == "train" else tqdm(dataloader)
 
-        if SCANREFER_PLUS_PLUS:
+        if SCANREFER_ENHANCE:
             final_output = {}
             mem_hash = {}
 
@@ -360,7 +360,7 @@ class Solver():
                     data_dict[key] = data_dict[key].cuda()
 
             # scanrefer++ support
-            if SCANREFER_PLUS_PLUS:
+            if SCANREFER_ENHANCE:
                 for scene_id in data_dict["scene_id"]:
                     if scene_id not in final_output:
                         final_output[scene_id] = []
@@ -453,7 +453,7 @@ class Solver():
                 self._global_iter_id += 1
 
         # scanrefer+= support
-        if SCANREFER_PLUS_PLUS and phase == "val":
+        if SCANREFER_ENHANCE and phase == "val":
             for key, value in final_output.items():
                 for query in value:
                     query["aabbs"] = [item.tolist() for item in query["aabbs"]]

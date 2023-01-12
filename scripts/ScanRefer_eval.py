@@ -225,7 +225,7 @@ def eval_ref(args):
             np.random.seed(seed)
 
             # scanrefer++ support
-            if SCANREFER_PLUS_PLUS:
+            if SCANREFER_ENHANCE:
                 final_output = {}
                 mem_hash = {}
 
@@ -239,7 +239,7 @@ def eval_ref(args):
             for data in tqdm(dataloader):
 
                 # scanrefer++ support
-                if SCANREFER_PLUS_PLUS:
+                if SCANREFER_ENHANCE:
                     for scene_id in data["scene_id"]:
                         if scene_id not in final_output:
                             final_output[scene_id] = []
@@ -305,15 +305,16 @@ def eval_ref(args):
                 pickle.dump(predictions, f)
 
             # scanrefer+= support
-            if SCANREFER_PLUS_PLUS:
+            if SCANREFER_ENHANCE:
                 for key, value in final_output.items():
                     for query in value:
                         query["aabbs"] = [item.tolist() for item in query["aabbs"]]
-                    os.makedirs("scanrefer++_test", exist_ok=True)
-                    with open(f"scanrefer++_test/{key}.json", "w") as f:
+                    dir_name = f"scanrefer++_test_{SCANREFER_ENHANCE_LOSS_THRESHOLD}_{SCANREFER_ENHANCE_EVAL_THRESHOLD}_{SCANREFER_ENHANCE_VANILLE}_{USE_GT}"
+                    os.makedirs(dir_name, exist_ok=True)
+                    with open(f"{dir_name}/{key}.json", "w") as f:
                         json.dump(value, f)
 
-                all_preds, all_gts = load_gt_and_pred_jsons_from_disk("scanrefer++_test", "3dvg_gt")
+                all_preds, all_gts = load_gt_and_pred_jsons_from_disk(dir_name, "3dvg_gt")
                 iou_25_results, iou_50_results = evaluate_all_scenes(all_preds, all_gts)
                 print_evaluation_results("F1-scores", iou_25_results, iou_50_results)
             # end
