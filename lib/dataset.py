@@ -16,6 +16,7 @@ from lib.config import CONF
 from utils.pc_utils import random_sampling, rotx, roty, rotz
 from data.scannet.model_util_scannet import ScannetDatasetConfig, rotate_aligned_boxes_along_axis
 import random
+from macro import *
 
 # data setting
 DC = ScannetDatasetConfig()
@@ -28,7 +29,6 @@ SCANNET_V2_TSV = os.path.join(CONF.PATH.SCANNET_META, "scannetv2-labels.combined
 MULTIVIEW_DATA = CONF.MULTIVIEW
 GLOVE_PICKLE = os.path.join(CONF.PATH.DATA, "glove.p")
 
-SCANREFER_ENHANCE = True
 
 class ScannetReferenceDataset(Dataset):
        
@@ -117,6 +117,39 @@ class ScannetReferenceDataset(Dataset):
         print('shuffle done', flush=True)
 
 
+    def _generate_gt_clusters(self, points, sem_labels, instance_ids):
+        gt_proposals_idx = []
+        gt_proposals_offset = [0]
+        unique_instance_ids = np.unique(instance_ids)
+        num_instance = len(unique_instance_ids) - 1 if 0 in unique_instance_ids else len(unique_instance_ids)
+        instance_bboxes = np.zeros((num_instance, 6))
+        object_ids = []
+
+        for cid, i_ in enumerate(unique_instance_ids, -1):
+            if i_ <= 0:
+                continue
+            object_ids.append(i_)
+            inst_i_idx = np.where(instance_ids == i_)[0]
+            if sem_labels[inst_i_idx][0] in [1, 2, 22]:
+                continue
+            inst_i_points = points[inst_i_idx]
+            xmin = np.min(inst_i_points[:, 0])
+            ymin = np.min(inst_i_points[:, 1])
+            zmin = np.min(inst_i_points[:, 2])
+            xmax = np.max(inst_i_points[:, 0])
+            ymax = np.max(inst_i_points[:, 1])
+            zmax = np.max(inst_i_points[:, 2])
+            bbox = np.array(
+                [(xmin + xmax) / 2, (ymin + ymax) / 2, (zmin + zmax) / 2, xmax - xmin, ymax - ymin, zmax - zmin])
+            instance_bboxes[cid, :] = bbox
+            proposals_idx_i = np.vstack((np.ones(len(inst_i_idx)) * cid, inst_i_idx)).transpose().astype(np.int32)
+            gt_proposals_idx.append(proposals_idx_i)
+            gt_proposals_offset.append(len(inst_i_idx) + gt_proposals_offset[-1])
+        gt_proposals_idx = np.concatenate(gt_proposals_idx, axis=0)
+        gt_proposals_offset = np.array(gt_proposals_offset).astype(np.int32)
+        return gt_proposals_idx, gt_proposals_offset, object_ids, instance_bboxes
+
+
     def __getitem__(self, idx):
         start = time.time()
 
@@ -185,16 +218,16 @@ class ScannetReferenceDataset(Dataset):
         instance_bboxes = self.scene_data[scene_id]["instance_bboxes"]
 
         if not self.use_color:
-            point_cloud = mesh_vertices[:,0:3] # do not use color for now
-            pcl_color = mesh_vertices[:,3:6]
+            point_cloud = mesh_vertices[:, 0:3] # do not use color for now
+            pcl_color = mesh_vertices[:, 3:6]
         else:
-            point_cloud = mesh_vertices[:,0:6]
-            point_cloud[:,3:6] = (point_cloud[:,3:6]-MEAN_COLOR_RGB)/256.0
-            pcl_color = point_cloud[:,3:6]
+            point_cloud = mesh_vertices[:, 0:6]
+            point_cloud[:, 3:6] = (point_cloud[:, 3:6] - MEAN_COLOR_RGB) / 256.0
+            pcl_color = point_cloud[:, 3:6]
 
         if self.use_normal:
-            normals = mesh_vertices[:,6:9]
-            point_cloud = np.concatenate([point_cloud, normals],1)
+            normals = mesh_vertices[:, 6:9]
+            point_cloud = np.concatenate([point_cloud, normals], 1)
 
         if self.use_multiview:
             # load multiview database
@@ -203,7 +236,7 @@ class ScannetReferenceDataset(Dataset):
                 self.multiview_data[pid] = h5py.File(MULTIVIEW_DATA, "r", libver="latest")
 
             multiview = self.multiview_data[pid][scene_id]
-            point_cloud = np.concatenate([point_cloud, multiview],1)
+            point_cloud = np.concatenate([point_cloud, multiview], 1)
 
         if self.use_height:
             floor_height = np.percentile(point_cloud[:,2],0.99)
@@ -384,7 +417,19 @@ class ScannetReferenceDataset(Dataset):
         if self.split == "train":
             istrain = 1
 
+        if USE_GT:
+            scale = 50
+            scaled_points = point_cloud[:, :3] * scale
+            scaled_points -= scaled_points.min(0)
+
         data_dict = {}
+        if USE_GT:
+            data_dict["locs_scaled"] = scaled_points.astype(np.float32)
+            gt_proposals_idx, gt_proposals_offset, _, instances_bboxes_tmp = self._generate_gt_clusters(point_cloud[:, :3], instance_labels, sem_labels=semantic_labels)
+            data_dict["gt_proposals_idx"] = gt_proposals_idx
+            data_dict["gt_proposals_offset"] = gt_proposals_offset
+            data_dict["instances_bboxes_tmp"] = instances_bboxes_tmp
+
         data_dict["point_clouds"] = point_cloud.astype(np.float32) # point cloud data including features
         data_dict["unk"] = unk.astype(np.float32) # from glove
         data_dict["scene_id"] = scene_id
@@ -400,7 +445,7 @@ class ScannetReferenceDataset(Dataset):
         data_dict["vote_label"] = point_votes.astype(np.float32)
         data_dict["vote_label_mask"] = point_votes_mask.astype(np.int64)
         data_dict["scan_idx"] = np.array(idx).astype(np.int64)
-        data_dict["pcl_color"] = pcl_color
+        # data_dict["pcl_color"] = pcl_color
         data_dict["load_time"] = time.time() - start
 
         data_dict["lang_num"] = np.array(lang_num).astype(np.int64)
@@ -422,6 +467,8 @@ class ScannetReferenceDataset(Dataset):
         data_dict["ann_id"] = np.array(ann_id_list).astype(np.int64)
 
         data_dict["gt_box_num_list"] = np.array(gt_box_num_list).astype(np.int32)
+
+        data_dict["instance_ids"] = instance_labels.astype(np.int32)
 
         if SCANREFER_ENHANCE:
             data_dict["multi_ref_box_label_list"] = np.array(multi_ref_box_label_list)

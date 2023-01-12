@@ -16,8 +16,7 @@ NEAR_THRESHOLD = 0.3
 GT_VOTE_FACTOR = 3  # number of GT votes per point
 OBJECTNESS_CLS_WEIGHTS = [0.2, 0.8]  # put larger weights on positive objectness
 
-SCANREFER_ENHANCE = True
-SCANREFER_ENHANCE_VANILLE = False
+from macro import *
 
 def compute_vote_loss(data_dict):
     """ Compute vote loss: Match predicted votes to GT votes.
@@ -404,24 +403,25 @@ def get_loss(data_dict, config, detection=True, reference=True, use_lang_classif
     """
 
     # Vote loss
-    vote_loss = compute_vote_loss(data_dict)
+    if not USE_GT:
+        vote_loss = compute_vote_loss(data_dict)
 
-    # Obj loss
-    objectness_loss, objectness_label, objectness_mask, object_assignment = compute_objectness_loss(data_dict)
-    num_proposal = objectness_label.shape[1]
-    total_num_proposal = objectness_label.shape[0] * objectness_label.shape[1]
-    data_dict['objectness_label'] = objectness_label
-    data_dict['objectness_mask'] = objectness_mask
-    data_dict['object_assignment'] = object_assignment
-    data_dict['pos_ratio'] = torch.sum(objectness_label.float().cuda()) / float(total_num_proposal)
-    data_dict['neg_ratio'] = torch.sum(objectness_mask.float()) / float(total_num_proposal) - data_dict['pos_ratio']
+        # Obj loss
+        objectness_loss, objectness_label, objectness_mask, object_assignment = compute_objectness_loss(data_dict)
+        num_proposal = objectness_label.shape[1]
+        total_num_proposal = objectness_label.shape[0] * objectness_label.shape[1]
+        data_dict['objectness_label'] = objectness_label
+        data_dict['objectness_mask'] = objectness_mask
+        data_dict['object_assignment'] = object_assignment
+        data_dict['pos_ratio'] = torch.sum(objectness_label.float().cuda()) / float(total_num_proposal)
+        data_dict['neg_ratio'] = torch.sum(objectness_mask.float()) / float(total_num_proposal) - data_dict['pos_ratio']
 
-    # Box loss and sem cls loss
-    center_loss, heading_cls_loss, heading_reg_loss, size_cls_loss, size_reg_loss, sem_cls_loss = compute_box_and_sem_cls_loss(
-        data_dict, config)
-    box_loss = center_loss + 0.1 * heading_cls_loss + heading_reg_loss + 0.1 * size_cls_loss + size_reg_loss
+        # Box loss and sem cls loss
+        center_loss, heading_cls_loss, heading_reg_loss, size_cls_loss, size_reg_loss, sem_cls_loss = compute_box_and_sem_cls_loss(
+            data_dict, config)
+        box_loss = center_loss + 0.1 * heading_cls_loss + heading_reg_loss + 0.1 * size_cls_loss + size_reg_loss
 
-    if detection:
+    if detection and not USE_GT:
         data_dict['vote_loss'] = vote_loss
         data_dict['objectness_loss'] = objectness_loss
         data_dict['center_loss'] = center_loss

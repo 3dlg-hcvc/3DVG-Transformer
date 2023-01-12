@@ -15,8 +15,7 @@ from lib.loss import SoftmaxRankingLoss
 from utils.box_util import get_3d_box, get_3d_box_batch, box3d_iou
 from lib.scanrefer_plus_eval_helper import *
 
-SCANREFER_PLUS_PLUS = True
-
+from macro import *
 def eval_ref_one_sample(pred_bbox, gt_bbox):
     """ Evaluate one reference prediction
 
@@ -61,21 +60,21 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
     """
 
     #batch_size, num_words, _ = data_dict["lang_feat"].shape
+    if not USE_GT:
+        objectness_preds_batch = torch.argmax(data_dict['objectness_scores'], 2).long()
+        objectness_labels_batch = data_dict['objectness_label'].long()
 
-    objectness_preds_batch = torch.argmax(data_dict['objectness_scores'], 2).long()
-    objectness_labels_batch = data_dict['objectness_label'].long()
+        if post_processing:
+            _ = parse_predictions(data_dict, post_processing)
+            nms_masks = torch.LongTensor(data_dict['pred_mask']).cuda()
 
-    if post_processing:
-        _ = parse_predictions(data_dict, post_processing)
-        nms_masks = torch.LongTensor(data_dict['pred_mask']).cuda()
-
-        # construct valid mask
-        pred_masks = (nms_masks * objectness_preds_batch == 1).float()
-        label_masks = (objectness_labels_batch == 1).float()
-    else:
-        # construct valid mask
-        pred_masks = (objectness_preds_batch == 1).float()
-        label_masks = (objectness_labels_batch == 1).float()
+            # construct valid mask
+            pred_masks = (nms_masks * objectness_preds_batch == 1).float()
+            label_masks = (objectness_labels_batch == 1).float()
+        else:
+            # construct valid mask
+            pred_masks = (objectness_preds_batch == 1).float()
+            label_masks = (objectness_labels_batch == 1).float()
 
     #print("pred_masks", pred_masks.shape, label_masks.shape)
 

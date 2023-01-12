@@ -2,11 +2,9 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 import os
 import sys
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -68,7 +66,7 @@ def decode_scores(output_dict, end_points,  num_class, num_heading_bin, num_size
 
 class ProposalModule(nn.Module):
     def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal, sampling,
-                 seed_feat_dim=256, config_transformer=None, quality_channel=False, dataset_config=None):
+                 seed_feat_dim=256, config_transformer=None, quality_channel=False, dataset_config=None, use_gt=False):
         super().__init__()
         if config_transformer is None:
             raise NotImplementedError('You should input a config')
@@ -105,7 +103,7 @@ class ProposalModule(nn.Module):
         self.seed_feat_dim = seed_feat_dim
         self.quality_channel = quality_channel
         self.dataset_config = dataset_config
-
+        self.use_gt = use_gt
         # Vote clustering
         self.vote_aggregation = PointnetSAModuleVotes(
             npoint=self.num_proposal,
@@ -143,20 +141,25 @@ class ProposalModule(nn.Module):
             scores: (B,num_proposal,2+3+NH*2+NS*4) 
         """
 
-        seed_xyz, seed_features = end_points['seed_xyz'], features
-        if self.sampling == 'vote_fps':
+
+        if self.sampling == 'vote_fps' and not self.use_gt:
+            seed_xyz, seed_features = end_points['seed_xyz'], features
             # Farthest point sampling (FPS) on votes
             xyz, features, fps_inds = self.vote_aggregation(xyz, features)
             sample_inds = fps_inds
-        else:
-            raise NotImplementedError('Unknown sampling strategy: %s. Exiting!' % (self.sampling))
+            end_points['aggregated_vote_xyz'] = xyz  # (batch_size, num_proposal, 3)
+            end_points['aggregated_vote_features'] = features.permute(0, 2, 1).contiguous() # (batch_size, num_proposal, 128)
+            # end_points['aggregated_vote_inds'] = sample_inds  # (batch_size, num_proposal,) # should be 0,1,2,...,num_proposal
 
-        end_points['aggregated_vote_xyz'] = xyz  # (batch_size, num_proposal, 3)
-        end_points['aggregated_vote_features'] = features.permute(0, 2, 1).contiguous() # (batch_size, num_proposal, 128)
-        end_points['aggregated_vote_inds'] = sample_inds  # (batch_size, num_proposal,) # should be 0,1,2,...,num_proposal
+            # --------- PROPOSAL GENERATION ----------  TODO PROPOSAL GENERATION AND CHANGE LOSS GENERATION
+            # print(features.mean(), features.std(), ' << first,votenet forward features mean and std', flush=True) # TODO CHECK IT
 
-        # --------- PROPOSAL GENERATION ----------  TODO PROPOSAL GENERATION AND CHANGE LOSS GENERATION
-        # print(features.mean(), features.std(), ' << first,votenet forward features mean and std', flush=True) # TODO CHECK IT
+        if self.use_gt:
+
+            end_points['aggregated_vote_xyz'] = xyz
+            end_points['aggregated_vote_features'] = features
+            features = features.permute(0, 2, 1)
+
         features = F.relu(self.bn1(self.conv1(features)))
         features = F.relu(self.bn2(self.conv2(features)))
 
