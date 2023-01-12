@@ -6,7 +6,7 @@ import torch
 
 import numpy as np
 
-from lib.pointgroup_ops.functions import pointgroup_ops
+
 from torch.utils.data._utils.collate import default_collate
 from torch.utils.data import DataLoader
 from datetime import datetime
@@ -15,6 +15,7 @@ from copy import deepcopy
 sys.path.append(os.path.join(os.getcwd())) # HACK add the root folder
 
 from data.scannet.model_util_scannet import ScannetDatasetConfig
+from lib.pointgroup_ops.functions import pointgroup_ops
 from lib.dataset import ScannetReferenceDataset
 from lib.solver import Solver
 from lib.config import CONF
