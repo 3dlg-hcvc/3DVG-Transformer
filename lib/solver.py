@@ -462,7 +462,7 @@ class Solver():
                 self._global_iter_id += 1
 
         # scanrefer+= support
-        if SCANREFER_ENHANCE:
+        if SCANREFER_ENHANCE and phase == "val":
             for key, value in final_output.items():
                 for query in value:
                     query["aabbs"] = [item.tolist() for item in query["aabbs"]]
