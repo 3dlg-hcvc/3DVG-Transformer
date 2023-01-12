@@ -117,10 +117,11 @@ class ScannetReferenceDataset(Dataset):
         print('shuffle done', flush=True)
 
 
-    def _generate_gt_clusters(self, points, sem_labels, instance_ids):
+    def _generate_gt_clusters(self, points, instance_ids, sem_labels):
         gt_proposals_idx = []
         gt_proposals_offset = [0]
-        unique_instance_ids = np.unique(instance_ids)
+        filtered_instance_ids = instance_ids[(sem_labels != 1) & (sem_labels != 2) & (sem_labels != 22)]
+        unique_instance_ids = np.unique(filtered_instance_ids)
         num_instance = len(unique_instance_ids) - 1 if 0 in unique_instance_ids else len(unique_instance_ids)
         instance_bboxes = np.zeros((num_instance, 6))
         object_ids = []
@@ -130,8 +131,7 @@ class ScannetReferenceDataset(Dataset):
                 continue
             object_ids.append(i_)
             inst_i_idx = np.where(instance_ids == i_)[0]
-            if sem_labels[inst_i_idx][0] in [1, 2, 22]:
-                continue
+
             inst_i_points = points[inst_i_idx]
             xmin = np.min(inst_i_points[:, 0])
             ymin = np.min(inst_i_points[:, 1])
@@ -425,7 +425,7 @@ class ScannetReferenceDataset(Dataset):
         data_dict = {}
         if USE_GT:
             data_dict["locs_scaled"] = scaled_points.astype(np.float32)
-            gt_proposals_idx, gt_proposals_offset, _, instances_bboxes_tmp = self._generate_gt_clusters(point_cloud[:, :3], instance_labels, sem_labels=semantic_labels)
+            gt_proposals_idx, gt_proposals_offset, _, instances_bboxes_tmp = self._generate_gt_clusters(point_cloud[:, :3], instance_labels, semantic_labels)
             data_dict["gt_proposals_idx"] = gt_proposals_idx
             data_dict["gt_proposals_offset"] = gt_proposals_offset
             data_dict["instances_bboxes_tmp"] = instances_bboxes_tmp

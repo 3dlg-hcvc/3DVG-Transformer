@@ -311,10 +311,12 @@ class Solver():
         )
 
         # dump
+
         self._running_log["ref_loss"] = data_dict["ref_loss"]
         self._running_log["lang_loss"] = data_dict["lang_loss"]
         self._running_log["objectness_loss"] = data_dict["objectness_loss"]
-        self._running_log["vote_loss"] = data_dict["vote_loss"]
+        if not USE_GT:
+            self._running_log["vote_loss"] = data_dict["vote_loss"]
         self._running_log["box_loss"] = data_dict["box_loss"]
         self._running_log["loss"] = data_dict["loss"]
 
