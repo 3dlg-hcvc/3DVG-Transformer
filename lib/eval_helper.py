@@ -75,6 +75,9 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
             # construct valid mask
             pred_masks = (objectness_preds_batch == 1).float()
             label_masks = (objectness_labels_batch == 1).float()
+    else:
+        pred_masks = torch.ones(size=(data_dict["center_label"].shape[0], 256), dtype=torch.float32, device="cuda")
+        label_masks = torch.ones(size=(data_dict["center_label"].shape[0], 256), dtype=torch.float32, device="cuda")
 
     #print("pred_masks", pred_masks.shape, label_masks.shape)
 
@@ -283,16 +286,17 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
 
     # --------------------------------------------
     # Some other statistics
-    obj_pred_val = torch.argmax(data_dict['objectness_scores'], 2)  # B,K
-    obj_acc = torch.sum(
-        (obj_pred_val == data_dict['objectness_label'].long()).float() * data_dict['objectness_mask']) / (
-                          torch.sum(data_dict['objectness_mask']) + 1e-6)
-    data_dict['obj_acc'] = obj_acc
-    # detection semantic classification
-    sem_cls_label = torch.gather(data_dict['sem_cls_label'], 1,
-                                 data_dict['object_assignment'])  # select (B,K) from (B,K2)
-    sem_cls_pred = data_dict['sem_cls_scores'].argmax(-1)  # (B,K)
-    sem_match = (sem_cls_label == sem_cls_pred).float()
-    data_dict["sem_acc"] = (sem_match * data_dict["pred_mask"]).sum() / data_dict["pred_mask"].sum()
+    if not USE_GT:
+        obj_pred_val = torch.argmax(data_dict['objectness_scores'], 2)  # B,K
+        obj_acc = torch.sum(
+            (obj_pred_val == data_dict['objectness_label'].long()).float() * data_dict['objectness_mask']) / (
+                              torch.sum(data_dict['objectness_mask']) + 1e-6)
+        data_dict['obj_acc'] = obj_acc
+        # detection semantic classification
+        sem_cls_label = torch.gather(data_dict['sem_cls_label'], 1,
+                                     data_dict['object_assignment'])  # select (B,K) from (B,K2)
+        sem_cls_pred = data_dict['sem_cls_scores'].argmax(-1)  # (B,K)
+        sem_match = (sem_cls_label == sem_cls_pred).float()
+        data_dict["sem_acc"] = (sem_match * data_dict["pred_mask"]).sum() / data_dict["pred_mask"].sum()
 
     return data_dict

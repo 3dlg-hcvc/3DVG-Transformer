@@ -60,7 +60,7 @@ class RefNet(nn.Module):
             'pre_norm': False
         }
         self.proposal = ProposalModule(num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal,
-                                       sampling, config_transformer=config_transformer, dataset_config=dataset_config, use_gt=USE_GT)
+                                       sampling, config_transformer=config_transformer, dataset_config=dataset_config)
 
         if not no_reference:
             # --------- LANGUAGE ENCODING ---------
@@ -117,7 +117,10 @@ class RefNet(nn.Module):
             data_dict["vote_features"] = features
             data_dict = self.proposal(xyz, features, data_dict)
         else:
+
             data_dict = self.backbone_net.feed(data_dict)
+
+
             data_dict = self.proposal(data_dict["proposal_centers"], data_dict["proposal_features"], data_dict)
         # --------- PROPOSAL GENERATION ---------
 
@@ -129,7 +132,6 @@ class RefNet(nn.Module):
             #                                     #
             #######################################
 
-            # --------- LANGUAGE ENCODING ---------
             data_dict = self.lang(data_dict)
 
             #######################################
@@ -141,5 +143,6 @@ class RefNet(nn.Module):
             # --------- PROPOSAL MATCHING ---------
             # config for bbox_embedding
             data_dict = self.match(data_dict)
+
 
         return data_dict

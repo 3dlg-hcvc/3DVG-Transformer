@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import os
-import sys
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)   # DETR
 
@@ -15,7 +14,7 @@ from easydict import EasyDict
 from models.detr.detr3d import DETR3D
 from models.detr.transformer3D import decode_scores_boxes
 from utils.box_util import get_3d_box_batch
-
+from macro import *
 
 def decode_scores_classes(output_dict, end_points, num_class):
     pred_logits = output_dict['pred_logits']
@@ -66,7 +65,7 @@ def decode_scores(output_dict, end_points,  num_class, num_heading_bin, num_size
 
 class ProposalModule(nn.Module):
     def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal, sampling,
-                 seed_feat_dim=256, config_transformer=None, quality_channel=False, dataset_config=None, use_gt=False):
+                 seed_feat_dim=256, config_transformer=None, quality_channel=False, dataset_config=None):
         super().__init__()
         if config_transformer is None:
             raise NotImplementedError('You should input a config')
@@ -103,7 +102,6 @@ class ProposalModule(nn.Module):
         self.seed_feat_dim = seed_feat_dim
         self.quality_channel = quality_channel
         self.dataset_config = dataset_config
-        self.use_gt = use_gt
         # Vote clustering
         self.vote_aggregation = PointnetSAModuleVotes(
             npoint=self.num_proposal,
@@ -117,20 +115,25 @@ class ProposalModule(nn.Module):
         # Object proposal/detection
         # Objectness scores (2), center residual (3),
         # heading class+residual (num_heading_bin*2), size class+residual(num_size_cluster*4)
-        self.conv1 = torch.nn.Conv1d(128, 128, 1)
-        self.conv2 = torch.nn.Conv1d(128, 128, 1)
-        self.bn1 = torch.nn.BatchNorm1d(128)
-        self.bn2 = torch.nn.BatchNorm1d(128)
-        # JUST FOR
+        if not USE_GT:
+            self.conv1 = torch.nn.Conv1d(128, 128, 1)
+            self.conv2 = torch.nn.Conv1d(128, 128, 1)
+            self.bn1 = torch.nn.BatchNorm1d(128)
+            self.bn2 = torch.nn.BatchNorm1d(128)
+            # JUST FOR
 
-        if self.position_type == 'seed_attention':
-            self.seed_feature_trans = torch.nn.Sequential(
-                torch.nn.Conv1d(256, 128, 1),
-                torch.nn.BatchNorm1d(128),
-                torch.nn.PReLU(128)
-            )
+            if self.position_type == 'seed_attention':
+                self.seed_feature_trans = torch.nn.Sequential(
+                    torch.nn.Conv1d(256, 128, 1),
+                    torch.nn.BatchNorm1d(128),
+                    torch.nn.PReLU(128)
+                )
 
-        self.detr = DETR3D(config_transformer, input_channels=128, class_output_shape=2+num_class, bbox_output_shape=3+num_heading_bin*2+num_size_cluster*4+int(quality_channel))
+            self.detr = DETR3D(config_transformer, input_channels=128, class_output_shape=2+num_class, bbox_output_shape=3+num_heading_bin*2+num_size_cluster*4+int(quality_channel))
+        else:
+
+            self.detr = DETR3D(config_transformer, input_channels=16, class_output_shape=2 + num_class,
+                               bbox_output_shape=3 + num_heading_bin * 2 + num_size_cluster * 4 + int(quality_channel))
 
     def forward(self, xyz, features, end_points):  # initial_xyz and xyz(voted): just for encoding
         """
@@ -142,7 +145,7 @@ class ProposalModule(nn.Module):
         """
 
 
-        if self.sampling == 'vote_fps' and not self.use_gt:
+        if self.sampling == 'vote_fps' and not USE_GT:
             seed_xyz, seed_features = end_points['seed_xyz'], features
             # Farthest point sampling (FPS) on votes
             xyz, features, fps_inds = self.vote_aggregation(xyz, features)
@@ -153,21 +156,21 @@ class ProposalModule(nn.Module):
 
             # --------- PROPOSAL GENERATION ----------  TODO PROPOSAL GENERATION AND CHANGE LOSS GENERATION
             # print(features.mean(), features.std(), ' << first,votenet forward features mean and std', flush=True) # TODO CHECK IT
-
-        if self.use_gt:
-
-            end_points['aggregated_vote_xyz'] = xyz
-            end_points['aggregated_vote_features'] = features
+            features = F.relu(self.bn1(self.conv1(features)))
+            features = F.relu(self.bn2(self.conv2(features)))
             features = features.permute(0, 2, 1)
 
-        features = F.relu(self.bn1(self.conv1(features)))
-        features = F.relu(self.bn2(self.conv2(features)))
+        if USE_GT:
+            end_points['aggregated_vote_xyz'] = xyz
+            end_points['aggregated_vote_features'] = features
+
+
 
         # print(features.mean(), features.std(), ' << votenet forward features mean and std', flush=True) # TODO CHECK IT
 
         # _xyz = torch.gather(initial_xyz, 1, sample_inds.long().unsqueeze(-1).repeat(1,1,3))
         # print(initial_xyz.shape, xyz.shape, sample_inds.shape, _xyz.shape, '<< sample xyz shape', flush=True)
-        features = features.permute(0, 2, 1)
+
         # print(xyz.shape, features.shape, '<< detr input feature dim')
         if self.position_type == 'vote':
             output_dict = self.detr(xyz, features, end_points)

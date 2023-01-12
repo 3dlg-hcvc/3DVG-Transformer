@@ -11,7 +11,7 @@ class GTDetector(nn.Module):
         super().__init__()
 
         in_channel = 3 + 3 + 128
-        m = 128
+        m = 16
         self.m = m
         D = 3
         blocks = [1, 2, 3, 4, 5, 6, 7]
@@ -86,7 +86,6 @@ class GTDetector(nn.Module):
             end_idx = data_dict["gt_proposals_offset"][idx+1]
             proposal_info = data_dict["gt_proposals_idx"][start_idx:end_idx]
             proposal_point_mask = proposal_info[:, 1].long()
-            instance_id = proposal_info[:, 0]
             proposal_features = torch.mean(pt_feats[proposal_point_mask], dim=0)
             gt_proposal_features[idx] = proposal_features
             sem_labels[idx] = 0
@@ -105,6 +104,7 @@ class GTDetector(nn.Module):
 
 
     def feed(self, data_dict):
+
         data_dict["voxel_feats"] = pointgroup_ops.voxelization(data_dict["feats"], data_dict["v2p_map"], 4)  # (M, C), float, cuda
         data_dict = self.forward(data_dict)
         data_dict = self.convert_stack_to_batch(data_dict)
