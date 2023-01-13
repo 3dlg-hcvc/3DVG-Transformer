@@ -309,7 +309,7 @@ def eval_ref(args):
                 for key, value in final_output.items():
                     for query in value:
                         query["aabbs"] = [item.tolist() for item in query["aabbs"]]
-                    dir_name = f"scanrefer++_test_{SCANREFER_ENHANCE_LOSS_THRESHOLD}_{SCANREFER_ENHANCE_EVAL_THRESHOLD}_{SCANREFER_ENHANCE_VANILLE}_{USE_GT}"
+                    dir_name = f"scanrefer++_test"
                     os.makedirs(dir_name, exist_ok=True)
                     with open(f"{dir_name}/{key}.json", "w") as f:
                         json.dump(value, f)

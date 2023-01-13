@@ -204,6 +204,7 @@ class Solver():
         # base_lr = self.lr_scheduler.get_lr()[0]
         # base_group_lr = [param['lr'] for param in self.optimizer.param_groups]
         for epoch_id in range(epoch):
+            torch.cuda.empty_cache()
             try:
                 self._log("epoch {} starting...".format(epoch_id + 1))
 
@@ -448,7 +449,9 @@ class Solver():
                     self._train_report(epoch_id)
 
                 # evaluation
+
                 if self._global_iter_id % self.val_step == 0 and self._global_iter_id != 0:
+                    torch.cuda.empty_cache()
                     print("evaluating...")
                     # val
                     self._feed(self.dataloader["val"], "val", epoch_id)
