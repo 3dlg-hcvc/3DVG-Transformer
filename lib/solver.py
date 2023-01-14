@@ -3,22 +3,17 @@ File Created: Monday, 25th November 2019 1:35:30 pm
 Author: Dave Zhenyu Chen (zhenyu.chen@tum.de)
 '''
 
-import os
-import json
+
 import time
 import torch
-import numpy as np
-from tqdm import tqdm
 from tensorboardX import SummaryWriter
 from torch.optim.lr_scheduler import StepLR, MultiStepLR, CosineAnnealingLR
 from lib.scanrefer_plus_eval_helper import *
-
 from lib.config import CONF
 from lib.loss_helper import get_loss
 from lib.eval_helper import get_eval
 from utils.eta import decode_eta
 from lib.pointnet2.pytorch_utils import BNMomentumScheduler
-
 from macro import *
 
 ITER_REPORT_TEMPLATE = """
@@ -86,7 +81,7 @@ BEST_REPORT_TEMPLATE = """
 [sco.] obj_acc: {obj_acc}
 [sco.] pos_ratio: {pos_ratio}, neg_ratio: {neg_ratio}
 [sco.] iou_rate_0.25: {iou_rate_25}, iou_rate_0.5: {iou_rate_5}
-[sco.] scanrefer_plus_overall_25: {scanrefer++_overall_25}, scanrefer++_overall_50: {scanrefer++_overall_50}
+[sco.] scanrefer_plus_overall_25: {scanrefer_plus_overall_25}, scanrefer_plus_overall_50: {scanrefer_plus_overall_50}
 """
 
 class Solver():
@@ -466,10 +461,11 @@ class Solver():
 
         # scanrefer+= support
         if SCANREFER_ENHANCE and phase == "val":
+            dir_name = f"scanrefer++_test_{SCANREFER_ENHANCE_LOSS_THRESHOLD}_{SCANREFER_ENHANCE_EVAL_THRESHOLD}_{SCANREFER_ENHANCE_VANILLE}_{USE_GT}"
             for key, value in final_output.items():
                 for query in value:
                     query["aabbs"] = [item.tolist() for item in query["aabbs"]]
-                dir_name = f"scanrefer++_test_{SCANREFER_ENHANCE_LOSS_THRESHOLD}_{SCANREFER_ENHANCE_EVAL_THRESHOLD}_{SCANREFER_ENHANCE_VANILLE}_{USE_GT}"
+
                 os.makedirs(dir_name, exist_ok=True)
                 with open(f"{dir_name}/{key}.json", "w") as f:
                     json.dump(value, f)
