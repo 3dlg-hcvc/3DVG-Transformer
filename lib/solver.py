@@ -200,41 +200,45 @@ class Solver():
         # base_group_lr = [param['lr'] for param in self.optimizer.param_groups]
         for epoch_id in range(epoch):
             torch.cuda.empty_cache()
-            try:
-                self._log("epoch {} starting...".format(epoch_id + 1))
 
-                if self.lr_scheduler:
-                    # self.lr_scheduler.step()
-                    print("learning rate --> {}\n".format(self.lr_scheduler.get_lr()), flush=True)
-                    # now_lr = self.lr_scheduler.get_lr()[0]
-                    for (idx, param_group) in enumerate(self.optimizer.param_groups):
-                        # print(param_group.keys(), '<< param key shape')
-                        print('[LR Param Group]', param_group['Param_Name'], param_group['lr'], '<< should', flush=True)
-                        # param_group['lr'] = base_group_lr[idx] / base_lr * now_lr
+            self._log("epoch {} starting...".format(epoch_id + 1))
 
-                # feed 
-                self.dataloader['train'].dataset.shuffle_data()
-                self._feed(self.dataloader["train"], "train", epoch_id)
+            if self.lr_scheduler:
+                # self.lr_scheduler.step()
+                print("learning rate --> {}\n".format(self.lr_scheduler.get_last_lr()), flush=True)
+                # now_lr = self.lr_scheduler.get_lr()[0]
+                for (idx, param_group) in enumerate(self.optimizer.param_groups):
+                    # print(param_group.keys(), '<< param key shape')
+                    print('[LR Param Group]', param_group['Param_Name'], param_group['lr'], '<< should', flush=True)
+                    # param_group['lr'] = base_group_lr[idx] / base_lr * now_lr
 
-                # save model
-                self._log("saving last models...\n")
-                model_root = os.path.join(CONF.PATH.OUTPUT, self.stamp)
-                #torch.save(self.model.state_dict(), os.path.join(model_root, "model_last.pth"))
+            # feed
+            self.dataloader['train'].dataset.shuffle_data()
+            self._feed(self.dataloader["train"], "train", epoch_id)
 
-                # update lr scheduler
-                if self.lr_scheduler:
-                    print("update learning rate --> {}\n".format(self.lr_scheduler.get_lr()))
-                    self.lr_scheduler.step()
+            # save model
+            self._log("saving last models...\n")
+            model_root = os.path.join(CONF.PATH.OUTPUT, self.stamp)
+            #torch.save(self.model.state_dict(), os.path.join(model_root, "model_last.pth"))
 
-                # update bn scheduler
-                if self.bn_scheduler:
-                    print("update batch normalization momentum --> {}\n".format(self.bn_scheduler.lmbd(self.bn_scheduler.last_epoch)))
-                    self.bn_scheduler.step()
-                
-            except KeyboardInterrupt:
-                # finish training
-                self._finish(epoch_id)
-                exit()
+            # update lr scheduler
+            if self.lr_scheduler:
+                print("update learning rate --> {}\n".format(self.lr_scheduler.get_last_lr()))
+                self.lr_scheduler.step()
+
+            # update bn scheduler
+            if self.bn_scheduler:
+                print("update batch normalization momentum --> {}\n".format(self.bn_scheduler.lmbd(self.bn_scheduler.last_epoch)))
+                self.bn_scheduler.step()
+
+            if epoch_id != 0 and epoch_id % 10 == 0:
+                torch.cuda.empty_cache()
+                with torch.no_grad():
+                    print("evaluating...")
+                    # val
+                    self._feed(self.dataloader["val"], "val", epoch_id)
+                    self._dump_log("val")
+                    self._epoch_report(epoch_id)
 
         # finish training
         self._finish(epoch_id)
@@ -347,7 +351,6 @@ class Solver():
         self._reset_log(phase)
 
         # change dataloader
-        dataloader = dataloader if phase == "train" else tqdm(dataloader)
 
         if SCANREFER_ENHANCE:
             final_output = {}
@@ -406,7 +409,8 @@ class Solver():
             
             # eval
             start = time.time()
-            self._eval(data_dict, mem_hash=mem_hash, final_output=final_output)
+            if phase == "val":
+                self._eval(data_dict, mem_hash=mem_hash, final_output=final_output)
             self.log[phase]["eval"].append(time.time() - start)
 
             # record log
@@ -443,16 +447,6 @@ class Solver():
                 if (self._global_iter_id + 1) % self.verbose == 0:
                     self._train_report(epoch_id)
 
-                # evaluation
-
-                if self._global_iter_id % self.val_step == 0 and self._global_iter_id != 0:
-                    torch.cuda.empty_cache()
-                    print("evaluating...")
-                    # val
-                    self._feed(self.dataloader["val"], "val", epoch_id)
-                    self._dump_log("val")
-                    self._set_phase("train")
-                    self._epoch_report(epoch_id)
 
                 # dump log
                 if self._global_iter_id % 50 == 0:
