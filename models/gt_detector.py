@@ -66,6 +66,7 @@ class GTDetector(nn.Module):
         data_dict['heading_residuals'] = data_dict['heading_residual_label'].unsqueeze(2)
         data_dict['size_scores'] = data_dict['size_class_label'].unsqueeze(2)
         data_dict['size_residuals'] = data_dict['size_residual_label'].unsqueeze(2)
+        data_dict['objectness_label'] = data_dict["objectness_scores"]
         return data_dict
 
 
