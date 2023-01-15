@@ -38,29 +38,31 @@ class RefNet(nn.Module):
 
             # Hough voting
             self.vgen = VotingModule(self.vote_factor, 256)
+
+            # Vote aggregation and object proposal
+            config_transformer = None
+
+            config_transformer = {
+                'mask': 'no_mask',
+                'weighted_input': True,
+                'transformer_type': 'myAdd_20;deformable',
+                'deformable_type': 'myAdd',
+                'position_embedding': 'none',
+                'input_dim': 0,
+                'enc_layers': 0,
+                'dec_layers': 2,
+                'dim_feedforward': 2048,
+                'hidden_dim': 288,
+                'dropout': 0.1,
+                'nheads': 8,
+                'pre_norm': False
+            }
+            self.proposal = ProposalModule(num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal,
+                                           sampling, config_transformer=config_transformer,
+                                           dataset_config=dataset_config)
         else:
             self.backbone_net = GTDetector()
 
-        # Vote aggregation and object proposal
-        config_transformer = None
-
-        config_transformer = {
-            'mask': 'no_mask',
-            'weighted_input': True,
-            'transformer_type': 'myAdd_20;deformable',
-            'deformable_type': 'myAdd',
-            'position_embedding': 'none',
-            'input_dim': 0,
-            'enc_layers': 0,
-            'dec_layers': 2,
-            'dim_feedforward': 2048,
-            'hidden_dim': 288,
-            'dropout': 0.1,
-            'nheads': 8,
-            'pre_norm': False
-        }
-        self.proposal = ProposalModule(num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal,
-                                       sampling, config_transformer=config_transformer, dataset_config=dataset_config)
 
         if not no_reference:
             # --------- LANGUAGE ENCODING ---------
@@ -71,8 +73,12 @@ class RefNet(nn.Module):
             # --------- PROPOSAL MATCHING ---------
             # Match the generated proposals and select the most confident ones
             # self.match = MatchModule(num_proposals=num_proposal, lang_size=(1 + int(self.use_bidir)) * hidden_size, det_channel=256*2)
-            self.match = MatchModule(num_proposals=num_proposal, lang_size=(1 + int(self.use_bidir)) * hidden_size,
+            if not USE_GT:
+                self.match = MatchModule(num_proposals=num_proposal, lang_size=(1 + int(self.use_bidir)) * hidden_size,
                                      det_channel=config_transformer['hidden_dim'])  # bef 256
+            else:
+                self.match = MatchModule(num_proposals=num_proposal, lang_size=(1 + int(self.use_bidir)) * hidden_size,
+                                         det_channel=16)  # bef 256
 
     def forward(self, data_dict):
         """ Forward pass of the network
@@ -117,11 +123,7 @@ class RefNet(nn.Module):
             data_dict["vote_features"] = features
             data_dict = self.proposal(xyz, features, data_dict)
         else:
-
             data_dict = self.backbone_net.feed(data_dict)
-
-
-            data_dict = self.proposal(data_dict["proposal_centers"], data_dict["proposal_features"], data_dict)
         # --------- PROPOSAL GENERATION ---------
 
 

@@ -20,7 +20,7 @@ from macro import *
 
 # data setting
 DC = ScannetDatasetConfig()
-MAX_NUM_OBJ = 128
+MAX_NUM_OBJ = 256
 MEAN_COLOR_RGB = np.array([109.8, 97.2, 83.8])
 
 # data path
@@ -122,32 +122,18 @@ class ScannetReferenceDataset(Dataset):
         gt_proposals_offset = [0]
         filtered_instance_ids = instance_ids[(sem_labels != 1) & (sem_labels != 2) & (sem_labels != 22)]
         unique_instance_ids = np.unique(filtered_instance_ids)
-        num_instance = len(unique_instance_ids) - 1 if 0 in unique_instance_ids else len(unique_instance_ids)
-        instance_bboxes = np.zeros((num_instance, 6))
         object_ids = []
-
         for cid, i_ in enumerate(unique_instance_ids, -1):
             if i_ <= 0:
                 continue
             object_ids.append(i_)
             inst_i_idx = np.where(instance_ids == i_)[0]
-
-            inst_i_points = points[inst_i_idx]
-            xmin = np.min(inst_i_points[:, 0])
-            ymin = np.min(inst_i_points[:, 1])
-            zmin = np.min(inst_i_points[:, 2])
-            xmax = np.max(inst_i_points[:, 0])
-            ymax = np.max(inst_i_points[:, 1])
-            zmax = np.max(inst_i_points[:, 2])
-            bbox = np.array(
-                [(xmin + xmax) / 2, (ymin + ymax) / 2, (zmin + zmax) / 2, xmax - xmin, ymax - ymin, zmax - zmin])
-            instance_bboxes[cid, :] = bbox
             proposals_idx_i = np.vstack((np.ones(len(inst_i_idx)) * cid, inst_i_idx)).transpose().astype(np.int32)
             gt_proposals_idx.append(proposals_idx_i)
             gt_proposals_offset.append(len(inst_i_idx) + gt_proposals_offset[-1])
         gt_proposals_idx = np.concatenate(gt_proposals_idx, axis=0)
         gt_proposals_offset = np.array(gt_proposals_offset).astype(np.int32)
-        return gt_proposals_idx, gt_proposals_offset, object_ids, instance_bboxes
+        return gt_proposals_idx, gt_proposals_offset, object_ids
 
 
     def __getitem__(self, idx):
@@ -395,8 +381,6 @@ class ScannetReferenceDataset(Dataset):
             #print("ref_center_label",ref_center_label.shape,ref_center_label_lists.shape)
 
 
-
-
         else:
             num_bbox = 1
             point_votes = np.zeros([self.num_points, 9]) # make 3 votes identical
@@ -423,11 +407,10 @@ class ScannetReferenceDataset(Dataset):
             scaled_points = point_cloud[:, :3] * scale
             scaled_points -= scaled_points.min(0)
             data_dict["locs_scaled"] = scaled_points.astype(np.float32)
-            gt_proposals_idx, gt_proposals_offset, _, instances_bboxes_tmp = self._generate_gt_clusters(
+            gt_proposals_idx, gt_proposals_offset, _ = self._generate_gt_clusters(
                 point_cloud[:, :3], instance_labels, semantic_labels)
             data_dict["gt_proposals_idx"] = gt_proposals_idx
             data_dict["gt_proposals_offset"] = gt_proposals_offset
-            data_dict["instances_bboxes_tmp"] = instances_bboxes_tmp
 
         data_dict["point_clouds"] = point_cloud.astype(np.float32) # point cloud data including features
         data_dict["unk"] = unk.astype(np.float32) # from glove

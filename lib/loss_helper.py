@@ -102,8 +102,8 @@ def compute_objectness_loss(data_dict):
     # objectness_label: 1 if pred object center is within NEAR_THRESHOLD of any GT object
     # objectness_mask: 0 if pred object center is in gray zone (DONOTCARE), 1 otherwise
     euclidean_dist1 = torch.sqrt(dist1 + 1e-6)
-    objectness_label = torch.zeros((B, K), dtype=torch.long).cuda()
-    objectness_mask = torch.zeros((B, K)).cuda()
+    objectness_label = torch.zeros((B, K), dtype=torch.long, device="cuda")
+    objectness_mask = torch.zeros((B, K), device="cuda")
     objectness_label[euclidean_dist1 < NEAR_THRESHOLD] = 1
     objectness_mask[euclidean_dist1 < NEAR_THRESHOLD] = 1
     objectness_mask[euclidean_dist1 > FAR_THRESHOLD] = 1
@@ -271,7 +271,7 @@ def compute_reference_loss(data_dict, config, no_reference=False):
     # gt_size_class_list = data_dict['ref_size_class_label_list'].cpu().numpy()  # B
     # gt_size_residual_list = data_dict['ref_size_residual_label_list'].cpu().numpy()  # B,3
     # convert gt bbox parameters to bbox corners
-    batch_size, num_proposals = data_dict['aggregated_vote_features'].shape[:2]
+    batch_size, num_proposals = data_dict['center'].shape[:2]
     if SCANREFER_ENHANCE:
         batch_size, len_nun_max = data_dict["multi_ref_box_label_list"].shape[:2]
     else:
