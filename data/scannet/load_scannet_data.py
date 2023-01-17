@@ -81,10 +81,10 @@ def export(mesh_file, agg_file, seg_file, meta_file, label_map_file, output_file
         label_ids = np.zeros(shape=(num_verts), dtype=np.uint32) # 0: unannotated
         object_id_to_label_id = {}
         for label, segs in label_to_segs.items():
-            # if label not in label_map:
-            #     label_id = 39
-            # else:
-            label_id = label_map[label]
+            if label not in label_map:
+                label_id = 39
+            else:
+                label_id = label_map[label]
             for seg in segs:
                 verts = seg_to_verts[seg]
                 label_ids[verts] = label_id

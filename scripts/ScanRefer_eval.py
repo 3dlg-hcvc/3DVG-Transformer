@@ -21,7 +21,7 @@ from data.scannet.model_util_scannet import ScannetDatasetConfig
 
 SCANREFER_TRAIN = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_train.json")))
 SCANREFER_VAL = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_val.json")))
-# SCANREFER_VAL = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_test.json")))
+SCANREFER_TEST = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_test.json")))
 
 from macro import *
 
@@ -135,7 +135,7 @@ def get_scannet_scene_list(split):
 
 def get_scanrefer(args):
     if args.detection:
-        scene_list = get_scannet_scene_list("val")
+        scene_list = get_scannet_scene_list(args.split)
         scanrefer = []
         for scene_id in scene_list:
             data = deepcopy(SCANREFER_TRAIN[0])
@@ -143,6 +143,8 @@ def get_scanrefer(args):
             scanrefer.append(data)
     else:
         scanrefer = SCANREFER_TRAIN if args.use_train else SCANREFER_VAL
+        if args.split == "test" and not args.use_train:
+            scanrefer = SCANREFER_TEST
         scene_list = sorted(list(set([data["scene_id"] for data in scanrefer])))
         if args.num_scenes != -1:
             scene_list = scene_list[:args.num_scenes]
@@ -182,7 +184,7 @@ def eval_ref(args):
 
     # dataloader
     #_, dataloader = get_dataloader(args, scanrefer, scene_list, "val", DC)
-    _, dataloader = get_dataloader(args, scanrefer, scanrefer_val_new, scene_list, "val", DC)
+    _, dataloader = get_dataloader(args, scanrefer, scanrefer_val_new, scene_list, args.split, DC)
 
     # model
     model = get_model(args, DC)
@@ -482,7 +484,7 @@ def eval_det(args):
     scanrefer, scene_list = get_scanrefer(args)
 
     # dataloader
-    _, dataloader = get_dataloader(args, scanrefer, scene_list, "val", DC)
+    _, dataloader = get_dataloader(args, scanrefer, scene_list, args.split, DC)
 
     # model
     model = get_model(args, DC)
@@ -563,6 +565,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_best", action="store_true", help="Use best bounding boxes as outputs.")
     parser.add_argument("--reference", action="store_true", help="evaluate the reference localization results")
     parser.add_argument("--detection", action="store_true", help="evaluate the object detection results")
+    parser.add_argument("--split", default="val")
     args = parser.parse_args()
 
     #assert args.lang_num_max == 1, 'lang max num == 1; avoid bugs'

@@ -79,10 +79,9 @@ class MatchModule(nn.Module):
         features = self.features_concat(features).permute(0, 2, 1)
 
         batch_size, num_proposal = features.shape[:2]
-        if not USE_GT:
-            objectness_masks = data_dict['objectness_scores'].max(2)[1].unsqueeze(2)  # batch_size, num_proposals, 1
-        else:
-            objectness_masks = data_dict["objectness_scores"]
+
+        objectness_masks = data_dict['objectness_scores'].max(2)[1].unsqueeze(2)  # batch_size, num_proposals, 1
+
 
 
         #features = self.mhatt(features, features, features, proposal_masks)

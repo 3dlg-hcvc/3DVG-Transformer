@@ -15,6 +15,7 @@ from lib.eval_helper import get_eval
 from utils.eta import decode_eta
 from lib.pointnet2.pytorch_utils import BNMomentumScheduler
 from macro import *
+import shutil
 
 ITER_REPORT_TEMPLATE = """
 -------------------------------iter: [{epoch_id}: {iter_id}/{total_iter}]-------------------------------
@@ -231,14 +232,14 @@ class Solver():
                 print("update batch normalization momentum --> {}\n".format(self.bn_scheduler.lmbd(self.bn_scheduler.last_epoch)))
                 self.bn_scheduler.step()
 
-            if epoch_id != 0 and epoch_id % 10 == 0:
-                torch.cuda.empty_cache()
-                with torch.no_grad():
-                    print("evaluating...")
-                    # val
-                    self._feed(self.dataloader["val"], "val", epoch_id)
-                    self._dump_log("val")
-                    self._epoch_report(epoch_id)
+
+            torch.cuda.empty_cache()
+            with torch.no_grad():
+                print("evaluating...")
+                # val
+                self._feed(self.dataloader["val"], "val", epoch_id)
+                self._dump_log("val")
+                self._epoch_report(epoch_id)
 
         # finish training
         self._finish(epoch_id)
@@ -447,7 +448,6 @@ class Solver():
                 if (self._global_iter_id + 1) % self.verbose == 0:
                     self._train_report(epoch_id)
 
-
                 # dump log
                 if self._global_iter_id % 50 == 0:
                     self._dump_log("train")
@@ -459,7 +459,6 @@ class Solver():
             for key, value in final_output.items():
                 for query in value:
                     query["aabbs"] = [item.tolist() for item in query["aabbs"]]
-
                 os.makedirs(dir_name, exist_ok=True)
                 with open(f"{dir_name}/{key}.json", "w") as f:
                     json.dump(value, f)
@@ -468,6 +467,7 @@ class Solver():
             iou_25_results, iou_50_results = evaluate_all_scenes(all_preds, all_gts)
             self.log[phase]["scanrefer++_overall_25"] = iou_25_results["overall"]
             self.log[phase]["scanrefer++_overall_50"] = iou_50_results["overall"]
+            shutil.rmtree(dir_name)
 
 
         # check best

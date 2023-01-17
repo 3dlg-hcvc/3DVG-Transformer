@@ -48,7 +48,8 @@ class GTDetector(nn.Module):
         batch_size = len(data_dict["batch_offsets"]) - 1
         max_num_proposal = 256
         data_dict["detr_features"] = torch.zeros(size=(batch_size, max_num_proposal, self.m), device="cuda", dtype=torch.float32)
-        data_dict["objectness_scores"] = torch.zeros(size=(batch_size, max_num_proposal, 1), device="cuda", dtype=bool)
+        data_dict["objectness_scores"] = torch.zeros(size=(batch_size, max_num_proposal, 2), device="cuda", dtype=torch.int32)
+        data_dict['objectness_label'] = torch.zeros(size=(batch_size, max_num_proposal), device="cuda", dtype=torch.int32)
 
         # proposal_bbox = data_dict["proposal_crop_bbox"].detach().cpu().numpy()
         # proposal_bbox = get_3d_box_batch(proposal_bbox[:, :3], proposal_bbox[:, 3:6],
@@ -59,19 +60,17 @@ class GTDetector(nn.Module):
             proposal_batch_idx = torch.nonzero(data_dict["proposals_batchId"] == b).squeeze(-1)
             pred_num = len(proposal_batch_idx)
             data_dict["detr_features"][b, :pred_num, :] = data_dict["proposal_feats"][proposal_batch_idx][:pred_num]
-            data_dict["objectness_scores"][b, :pred_num, 0] = data_dict["proposal_objectness_scores"][proposal_batch_idx][:pred_num]
-
+            data_dict["objectness_scores"][b, :pred_num, 1] = data_dict["proposal_objectness_scores"][proposal_batch_idx][:pred_num].int()
+            data_dict['objectness_label'][b, :pred_num] = data_dict["proposal_objectness_scores"][proposal_batch_idx][:pred_num].int()
         data_dict["center"] = data_dict['center_label']
         data_dict['heading_scores'] = data_dict['heading_class_label'].unsqueeze(2)
         data_dict['heading_residuals'] = data_dict['heading_residual_label'].unsqueeze(2)
         data_dict['size_scores'] = data_dict['size_class_label'].unsqueeze(2)
         data_dict['size_residuals'] = data_dict['size_residual_label'].unsqueeze(2)
-        data_dict['objectness_label'] = data_dict["objectness_scores"]
         return data_dict
 
 
     def forward(self, data_dict):
-        batch_size = len(data_dict["batch_offsets"]) - 1
         x = ME.SparseTensor(features=data_dict["voxel_feats"], coordinates=data_dict["voxel_locs"].int())
 
         #### backbone
