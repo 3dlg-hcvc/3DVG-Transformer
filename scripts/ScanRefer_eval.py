@@ -4,13 +4,12 @@ import pickle
 import torch
 
 from torch.utils.data._utils.collate import default_collate
-
+import os
 from torch.utils.data import DataLoader
 from copy import deepcopy
+sys.path.append(os.path.join(os.getcwd())) # HACK add the root folder
 from lib.scanrefer_plus_eval_helper import *
 from lib.pointgroup_ops.functions import pointgroup_ops
-sys.path.append(os.path.join(os.getcwd())) # HACK add the root folder
-
 from lib.config import CONF
 from lib.dataset import ScannetReferenceDataset
 from lib.ap_helper import APCalculator, parse_predictions, parse_groundtruths
