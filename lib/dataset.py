@@ -260,131 +260,126 @@ class ScannetReferenceDataset(Dataset):
         gt_box_num_list = []
         # end
 
-        if self.split != "test":
-            num_bbox = instance_bboxes.shape[0] if instance_bboxes.shape[0] < MAX_NUM_OBJ else MAX_NUM_OBJ
-            target_bboxes_mask[0:num_bbox] = 1
-            target_bboxes[0:num_bbox,:] = instance_bboxes[:MAX_NUM_OBJ,0:6]
+        num_bbox = instance_bboxes.shape[0] if instance_bboxes.shape[0] < MAX_NUM_OBJ else MAX_NUM_OBJ
+        target_bboxes_mask[0:num_bbox] = 1
+        target_bboxes[0:num_bbox,:] = instance_bboxes[:MAX_NUM_OBJ,0:6]
 
-            point_votes = np.zeros([self.num_points, 3])
-            point_votes_mask = np.zeros(self.num_points)
+        point_votes = np.zeros([self.num_points, 3])
+        point_votes_mask = np.zeros(self.num_points)
 
-            # ------------------------------- DATA AUGMENTATION ------------------------------
-            if self.augment:  # and not self.debug: # shape not changed; TODO scale
-                if np.random.random() > 0.7:
-                    # Flipping along the YZ plane
-                    point_cloud[:, 0] = -1 * point_cloud[:, 0]
-                    target_bboxes[:, 0] = -1 * target_bboxes[:, 0]
+        # ------------------------------- DATA AUGMENTATION ------------------------------
+        if self.augment:  # and not self.debug: # shape not changed; TODO scale
+            if np.random.random() > 0.7:
+                # Flipping along the YZ plane
+                point_cloud[:, 0] = -1 * point_cloud[:, 0]
+                target_bboxes[:, 0] = -1 * target_bboxes[:, 0]
 
-                if np.random.random() > 0.7:
-                    # Flipping along the XZ plane
-                    point_cloud[:, 1] = -1 * point_cloud[:, 1]
-                    target_bboxes[:, 1] = -1 * target_bboxes[:, 1]
+            if np.random.random() > 0.7:
+                # Flipping along the XZ plane
+                point_cloud[:, 1] = -1 * point_cloud[:, 1]
+                target_bboxes[:, 1] = -1 * target_bboxes[:, 1]
 
-                    # Rotation along X-axis
-                rot_angle = (np.random.random() * np.pi / 18) - np.pi / 36  # -5 ~ +5 degree
-                rot_mat = rotx(rot_angle)
-                point_cloud[:, 0:3] = np.dot(point_cloud[:, 0:3], np.transpose(rot_mat))
-                target_bboxes = rotate_aligned_boxes_along_axis(target_bboxes, rot_mat, "x")
+                # Rotation along X-axis
+            rot_angle = (np.random.random() * np.pi / 18) - np.pi / 36  # -5 ~ +5 degree
+            rot_mat = rotx(rot_angle)
+            point_cloud[:, 0:3] = np.dot(point_cloud[:, 0:3], np.transpose(rot_mat))
+            target_bboxes = rotate_aligned_boxes_along_axis(target_bboxes, rot_mat, "x")
 
-                # Rotation along Y-axis
-                rot_angle = (np.random.random() * np.pi / 18) - np.pi / 36  # -5 ~ +5 degree
-                rot_mat = roty(rot_angle)
-                point_cloud[:, 0:3] = np.dot(point_cloud[:, 0:3], np.transpose(rot_mat))
-                target_bboxes = rotate_aligned_boxes_along_axis(target_bboxes, rot_mat, "y")
+            # Rotation along Y-axis
+            rot_angle = (np.random.random() * np.pi / 18) - np.pi / 36  # -5 ~ +5 degree
+            rot_mat = roty(rot_angle)
+            point_cloud[:, 0:3] = np.dot(point_cloud[:, 0:3], np.transpose(rot_mat))
+            target_bboxes = rotate_aligned_boxes_along_axis(target_bboxes, rot_mat, "y")
 
-                # Rotation along up-axis/Z-axis
-                rot_angle = (np.random.random() * np.pi / 18) - np.pi / 36  # -5 ~ +5 degree
-                rot_mat = rotz(rot_angle)
-                point_cloud[:, 0:3] = np.dot(point_cloud[:, 0:3], np.transpose(rot_mat))
-                target_bboxes = rotate_aligned_boxes_along_axis(target_bboxes, rot_mat, "z")
+            # Rotation along up-axis/Z-axis
+            rot_angle = (np.random.random() * np.pi / 18) - np.pi / 36  # -5 ~ +5 degree
+            rot_mat = rotz(rot_angle)
+            point_cloud[:, 0:3] = np.dot(point_cloud[:, 0:3], np.transpose(rot_mat))
+            target_bboxes = rotate_aligned_boxes_along_axis(target_bboxes, rot_mat, "z")
 
-                # print('Warning! Dont Use Extra Augmentation!(votenet didnot use it)', flush=True)
-                # NEW: scale from 0.8 to 1.2
-                # print(rot_mat.shape, point_cloud.shape, flush=True)
-                scale = np.random.uniform(-0.1, 0.1, (3, 3))
-                scale = np.exp(scale)
-                # print(scale, '<<< scale', flush=True)
-                scale = scale * np.eye(3)
-                point_cloud[:, 0:3] = np.dot(point_cloud[:, 0:3], scale)
-                if self.use_height:
-                    point_cloud[:, 3] = point_cloud[:, 3] * float(scale[2, 2])
-                target_bboxes[:, 0:3] = np.dot(target_bboxes[:, 0:3], scale)
-                target_bboxes[:, 3:6] = np.dot(target_bboxes[:, 3:6], scale)
+            # print('Warning! Dont Use Extra Augmentation!(votenet didnot use it)', flush=True)
+            # NEW: scale from 0.8 to 1.2
+            # print(rot_mat.shape, point_cloud.shape, flush=True)
+            scale = np.random.uniform(-0.1, 0.1, (3, 3))
+            scale = np.exp(scale)
+            # print(scale, '<<< scale', flush=True)
+            scale = scale * np.eye(3)
+            point_cloud[:, 0:3] = np.dot(point_cloud[:, 0:3], scale)
+            if self.use_height:
+                point_cloud[:, 3] = point_cloud[:, 3] * float(scale[2, 2])
+            target_bboxes[:, 0:3] = np.dot(target_bboxes[:, 0:3], scale)
+            target_bboxes[:, 3:6] = np.dot(target_bboxes[:, 3:6], scale)
 
-                # Translation
-                point_cloud, target_bboxes = self._translate(point_cloud, target_bboxes)
+            # Translation
+            point_cloud, target_bboxes = self._translate(point_cloud, target_bboxes)
 
-            # compute votes *AFTER* augmentation
-            # generate votes
-            # Note: since there's no map between bbox instance labels and
-            # pc instance_labels (it had been filtered
-            # in the data preparation step) we'll compute the instance bbox
-            # from the points sharing the same instance label.
-            for i_instance in np.unique(instance_labels):
-                # find all points belong to that instance
-                ind = np.where(instance_labels == i_instance)[0]
-                # find the semantic label
-                if semantic_labels[ind[0]] in DC.nyu40ids:
-                    x = point_cloud[ind,:3]
-                    center = 0.5*(x.min(0) + x.max(0))
-                    point_votes[ind, :] = center - x
-                    point_votes_mask[ind] = 1.0
-            point_votes = np.tile(point_votes, (1, 3)) # make 3 votes identical
+        # compute votes *AFTER* augmentation
+        # generate votes
+        # Note: since there's no map between bbox instance labels and
+        # pc instance_labels (it had been filtered
+        # in the data preparation step) we'll compute the instance bbox
+        # from the points sharing the same instance label.
+        for i_instance in np.unique(instance_labels):
+            # find all points belong to that instance
+            ind = np.where(instance_labels == i_instance)[0]
+            # find the semantic label
+            if semantic_labels[ind[0]] in DC.nyu40ids:
+                x = point_cloud[ind,:3]
+                center = 0.5*(x.min(0) + x.max(0))
+                point_votes[ind, :] = center - x
+                point_votes_mask[ind] = 1.0
+        point_votes = np.tile(point_votes, (1, 3)) # make 3 votes identical
 
-            class_ind = [DC.nyu40id2class[int(x)] for x in instance_bboxes[:num_bbox,-2]]
-            # NOTE: set size class as semantic class. Consider use size2class.
-            size_classes[0:num_bbox] = class_ind
-            size_residuals[0:num_bbox, :] = target_bboxes[0:num_bbox, 3:6] - DC.mean_size_arr[class_ind,:]
+        class_ind = [DC.nyu40id2class[int(x)] for x in instance_bboxes[:num_bbox,-2]]
+        # NOTE: set size class as semantic class. Consider use size2class.
+        size_classes[0:num_bbox] = class_ind
+        size_residuals[0:num_bbox, :] = target_bboxes[0:num_bbox, 3:6] - DC.mean_size_arr[class_ind,:]
 
-            # construct the reference target label for each bbox
-            for j in range(self.lang_num_max):
-                ref_box_label = np.zeros(MAX_NUM_OBJ, dtype=bool)
+        # construct the reference target label for each bbox
+        for j in range(self.lang_num_max):
+            ref_box_label = np.zeros(MAX_NUM_OBJ, dtype=bool)
 
-                # scanrefer++ support
-                multi_ref_box_label = np.zeros(MAX_NUM_OBJ, dtype=bool)
-                # end
+            # scanrefer++ support
+            multi_ref_box_label = np.zeros(MAX_NUM_OBJ, dtype=bool)
+            # end
 
-                if object_id_list[j] == -1 and SCANREFER_ENHANCE:
+            if object_id_list[j] == -1 and SCANREFER_ENHANCE:
+                ref_box_label_list.append(ref_box_label)
+                ref_heading_class_label_list.append(angle_classes[i])
+                ref_heading_residual_label_list.append(angle_residuals[i])
+                gt_box_num_list.append(len(multi_obj_ids_list[j]))
+                multi_ref_box_label_list.append(multi_ref_box_label)
+                continue
+
+            for i, gt_id in enumerate(instance_bboxes[:num_bbox, -1]):
+                if gt_id == object_id_list[j]:
+
+
+                    ref_box_label[i] = 1
+                    # ref_center_label = target_bboxes[i, 0:3]
+
+                    # ref_size_class_label = size_classes[i]
+                    # ref_size_residual_label = size_residuals[i]
+
                     ref_box_label_list.append(ref_box_label)
+                    # ref_center_label_list.append(ref_center_label)
                     ref_heading_class_label_list.append(angle_classes[i])
                     ref_heading_residual_label_list.append(angle_residuals[i])
-                    gt_box_num_list.append(len(multi_obj_ids_list[j]))
-                    multi_ref_box_label_list.append(multi_ref_box_label)
-                    continue
+                    # ref_size_class_label_list.append(ref_size_class_label)
+                    # ref_size_residual_label_list.append(ref_size_residual_label)
 
-                for i, gt_id in enumerate(instance_bboxes[:num_bbox, -1]):
-                    if gt_id == object_id_list[j]:
-
-
-                        ref_box_label[i] = 1
-                        # ref_center_label = target_bboxes[i, 0:3]
-
-                        # ref_size_class_label = size_classes[i]
-                        # ref_size_residual_label = size_residuals[i]
-
-                        ref_box_label_list.append(ref_box_label)
-                        # ref_center_label_list.append(ref_center_label)
-                        ref_heading_class_label_list.append(angle_classes[i])
-                        ref_heading_residual_label_list.append(angle_residuals[i])
-                        # ref_size_class_label_list.append(ref_size_class_label)
-                        # ref_size_residual_label_list.append(ref_size_residual_label)
-
-                    if SCANREFER_ENHANCE:
-
-                        if gt_id in multi_obj_ids_list[j]:
-                            multi_ref_box_label[i] = True
                 if SCANREFER_ENHANCE:
-                    gt_box_num_list.append(len(multi_obj_ids_list[j]))
-                    multi_ref_box_label_list.append(multi_ref_box_label)
 
-            #ref_center_label_lists = np.array(ref_center_label_list).astype(np.float32)
-            #print("ref_center_label",ref_center_label.shape,ref_center_label_lists.shape)
+                    if gt_id in multi_obj_ids_list[j]:
+                        multi_ref_box_label[i] = True
+            if SCANREFER_ENHANCE:
+                gt_box_num_list.append(len(multi_obj_ids_list[j]))
+                multi_ref_box_label_list.append(multi_ref_box_label)
+
+        #ref_center_label_lists = np.array(ref_center_label_list).astype(np.float32)
+        #print("ref_center_label",ref_center_label.shape,ref_center_label_lists.shape)
 
 
-        else:
-            num_bbox = 1
-            point_votes = np.zeros([self.num_points, 9]) # make 3 votes identical
-            point_votes_mask = np.zeros(self.num_points)
 
         target_bboxes_semcls = np.zeros((MAX_NUM_OBJ))
         try:
