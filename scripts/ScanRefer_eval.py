@@ -297,9 +297,9 @@ def eval_ref(args):
                         predictions[scene_id][object_id][ann_id]["gt_bbox"] = data["gt_bboxes"][i]
                         predictions[scene_id][object_id][ann_id]["iou"] = data["ref_iou"][i]
 
-            # save the last predictions
-            with open(pred_path, "wb") as f:
-                pickle.dump(predictions, f)
+            # # save the last predictions
+            # with open(pred_path, "wb") as f:
+            #     pickle.dump(predictions, f)
 
             # scanrefer+= support
             if SCANREFER_ENHANCE:
@@ -329,16 +329,16 @@ def eval_ref(args):
         others = np.array(others_all)
         lang_acc = np.array(lang_acc_all)
 
-        # save the global scores
-        with open(score_path, "wb") as f:
-            scores = {
-                "ref_acc": ref_acc_all,
-                "ious": ious_all,
-                "masks": masks_all,
-                "others": others_all,
-                "lang_acc": lang_acc_all
-            }
-            pickle.dump(scores, f)
+        # # save the global scores
+        # with open(score_path, "wb") as f:
+        #     scores = {
+        #         "ref_acc": ref_acc_all,
+        #         "ious": ious_all,
+        #         "masks": masks_all,
+        #         "others": others_all,
+        #         "lang_acc": lang_acc_all
+        #     }
+        #     pickle.dump(scores, f)
 
     else:
         print("loading the scores...")

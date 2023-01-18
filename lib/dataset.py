@@ -369,9 +369,9 @@ class ScannetReferenceDataset(Dataset):
                     # ref_size_residual_label_list.append(ref_size_residual_label)
 
                 if SCANREFER_ENHANCE:
-
                     if gt_id in multi_obj_ids_list[j]:
                         multi_ref_box_label[i] = True
+
             if SCANREFER_ENHANCE:
                 gt_box_num_list.append(len(multi_obj_ids_list[j]))
                 multi_ref_box_label_list.append(multi_ref_box_label)
@@ -382,10 +382,9 @@ class ScannetReferenceDataset(Dataset):
 
 
         target_bboxes_semcls = np.zeros((MAX_NUM_OBJ))
-        try:
-            target_bboxes_semcls[0:num_bbox] = [DC.nyu40id2class[int(x)] for x in instance_bboxes[:,-2][0:num_bbox]]
-        except KeyError:
-            pass
+
+        target_bboxes_semcls[0:num_bbox] = [DC.nyu40id2class[int(x)] for x in instance_bboxes[:,-2][0:num_bbox]]
+
 
         object_cat_list = []
         for i in range(self.lang_num_max):
