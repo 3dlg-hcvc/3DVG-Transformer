@@ -308,10 +308,16 @@ def compute_reference_loss(data_dict, config, no_reference=False):
 
         labels_new = np.zeros((len_nun_max, num_proposals))
         # convert the bbox parameters to bbox corners
-        pred_obb_batch = config.param2obb_batch(pred_center[i, :, 0:3], pred_heading_class[i],
-                                                pred_heading_residual[i],
-                                                pred_size_class[i], pred_size_residual[i])
-        pred_bbox_batch = get_3d_box_batch(pred_obb_batch[:, 3:6], pred_obb_batch[:, 6], pred_obb_batch[:, 0:3])
+        if USE_GT:
+            pred_obb_batch = config.param2obb_batch(data_dict["center_label"][i].cpu().numpy(), data_dict["heading_class_label"][i].cpu().numpy(),
+                                                    data_dict["heading_residual_label"][i].cpu().numpy(),
+                                                    data_dict["size_class_label"][i].cpu().numpy(), data_dict["size_residual_label"][i].cpu().numpy())
+            pred_bbox_batch = get_3d_box_batch(pred_obb_batch[:, 3:6], pred_obb_batch[:, 6], pred_obb_batch[:, 0:3])
+        else:
+            pred_obb_batch = config.param2obb_batch(pred_center[i, :, 0:3], pred_heading_class[i],
+                                                    pred_heading_residual[i],
+                                                    pred_size_class[i], pred_size_residual[i])
+            pred_bbox_batch = get_3d_box_batch(pred_obb_batch[:, 3:6], pred_obb_batch[:, 6], pred_obb_batch[:, 0:3])
         for j in range(len_nun_max):
             if j < lang_num[i]:
                 ious = box3d_iou_batch(pred_bbox_batch, np.tile(gt_bbox_batch[j], (num_proposals, 1, 1)))
@@ -339,20 +345,7 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                                            gt_size_class_labels, gt_bboxes_residuals)
 
 
-
                     gt_bbox_batch_new = get_3d_box_batch(gt_obb_batch_new[:, 3:6], gt_obb_batch_new[:, 6], gt_obb_batch_new[:, 0:3])
-
-                    # print(data_dict["scene_id"][i])
-                    # import open3d as o3d
-                    # pcd = o3d.geometry.PointCloud()
-                    # pcd.points = o3d.utility.Vector3dVector(data_dict["point_clouds"][i][:, :3].cpu().numpy())
-                    # pcd.colors = o3d.utility.Vector3dVector(data_dict["pcl_color"][i][:, :3].cpu().numpy() / 255)
-                    # bbox = []
-                    # for box in gt_bbox_batch_new:
-                    #     tmp_aabb = o3d.geometry.AxisAlignedBoundingBox.create_from_points(o3d.utility.Vector3dVector(box))
-                    #     tmp_aabb.color = [0, 1, 0]
-                    #     bbox.append(tmp_aabb)
-                    # o3d.visualization.draw_geometries(bbox + [pcd])
 
 
                     iou_matrix = np.zeros(shape=(gt_bbox_batch_new.shape[0], ious.shape[0]))
