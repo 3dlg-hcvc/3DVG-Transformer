@@ -256,18 +256,30 @@ def eval_ref(args):
                         reference=True,
                         use_lang_classifier=not args.no_lang_cls
                     )
-                    data = get_eval(
-                        data_dict=data, 
-                        config=DC,
-                        reference=True, 
-                        use_lang_classifier=not args.no_lang_cls,
-                        use_oracle=args.use_oracle,
-                        use_cat_rand=args.use_cat_rand,
-                        use_best=args.use_best,
-                        post_processing=POST_DICT,
-                        final_output=final_output,  # scanrefer++ support
-                        mem_hash=mem_hash  # scanrefer++ support
-                    )
+                    if SCANREFER_ENHANCE:
+                        data = get_eval(
+                            data_dict=data,
+                            config=DC,
+                            reference=True,
+                            use_lang_classifier=not args.no_lang_cls,
+                            use_oracle=args.use_oracle,
+                            use_cat_rand=args.use_cat_rand,
+                            use_best=args.use_best,
+                            post_processing=POST_DICT,
+                            final_output=final_output,  # scanrefer++ support
+                            mem_hash=mem_hash  # scanrefer++ support
+                        )
+                    else:
+                        data = get_eval(
+                            data_dict=data,
+                            config=DC,
+                            reference=True,
+                            use_lang_classifier=not args.no_lang_cls,
+                            use_oracle=args.use_oracle,
+                            use_cat_rand=args.use_cat_rand,
+                            use_best=args.use_best,
+                            post_processing=POST_DICT,
+                        )
 
 
                     ref_acc += data["ref_acc"]

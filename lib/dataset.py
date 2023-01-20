@@ -421,7 +421,7 @@ class ScannetReferenceDataset(Dataset):
         data_dict["vote_label"] = point_votes.astype(np.float32)
         data_dict["vote_label_mask"] = point_votes_mask.astype(np.int64)
         data_dict["scan_idx"] = np.array(idx).astype(np.int64)
-        # data_dict["pcl_color"] = pcl_color
+        data_dict["pcl_color"] = pcl_color
 
         data_dict["lang_num"] = np.array(lang_num).astype(np.int64)
         data_dict["lang_feat_list"] = np.array(lang_feat_list).astype(np.float32)  # language feature vectors

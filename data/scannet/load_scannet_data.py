@@ -82,7 +82,8 @@ def export(mesh_file, agg_file, seg_file, meta_file, label_map_file, output_file
         object_id_to_label_id = {}
         for label, segs in label_to_segs.items():
             if label not in label_map:
-                label_id = 39
+                print(label)
+                label_id = 40
             else:
                 label_id = label_map[label]
             for seg in segs:
@@ -169,6 +170,7 @@ def main():
     seg_file = os.path.join(opt.scan_path, scan_name + '_vh_clean_2.0.010000.segs.json')
     meta_file = os.path.join(opt.scan_path, scan_name + '.txt') # includes axisAlignment info for the train set scans.
     export(mesh_file, agg_file, seg_file, meta_file, opt.label_map_file, opt.output_file)
+
 
 if __name__ == '__main__':
     main()

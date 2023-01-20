@@ -156,8 +156,7 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
         pred_heading_class = torch.gather(pred_heading_class, 1, data_dict["object_assignment"])
         pred_heading_residual = torch.gather(pred_heading_residual, 1, data_dict["object_assignment"]).unsqueeze(-1)
         pred_size_class = torch.gather(pred_size_class, 1, data_dict["object_assignment"])
-        pred_size_residual = torch.gather(pred_size_residual, 1,
-                                          data_dict["object_assignment"].unsqueeze(2).repeat(1, 1, 3))
+        pred_size_residual = torch.gather(pred_size_residual, 1, data_dict["object_assignment"].unsqueeze(2).repeat(1, 1, 3))
     else:
         pred_center = data_dict['center']  # (B,K,3)
         pred_heading_class = torch.argmax(data_dict['heading_scores'], -1)  # B,num_proposal
@@ -198,8 +197,8 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
     gt_bboxes = []
     #print("pred_ref", pred_ref.shape, gt_ref.shape)
     pred_ref = pred_ref.reshape(batch_size, len_nun_max)
-
-    pred_ref_mul_obj_mask = pred_ref_mul_obj_mask.reshape(batch_size, len_nun_max, -1)
+    if SCANREFER_ENHANCE:
+        pred_ref_mul_obj_mask = pred_ref_mul_obj_mask.reshape(batch_size, len_nun_max, -1)
 
     for i in range(batch_size):
         # compute the iou
