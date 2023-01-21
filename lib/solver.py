@@ -15,7 +15,7 @@ from lib.eval_helper import get_eval
 from utils.eta import decode_eta
 from lib.pointnet2.pytorch_utils import BNMomentumScheduler
 from macro import *
-import shutil
+import json
 
 ITER_REPORT_TEMPLATE = """
 -------------------------------iter: [{epoch_id}: {iter_id}/{total_iter}]-------------------------------
@@ -455,19 +455,21 @@ class Solver():
 
         # scanrefer+= support
         if SCANREFER_ENHANCE and phase == "val":
-            dir_name = f"scanrefer++_test_{SCANREFER_ENHANCE_LOSS_THRESHOLD}_{SCANREFER_ENHANCE_EVAL_THRESHOLD}_{SCANREFER_ENHANCE_VANILLE}_{USE_GT}"
-            for key, value in final_output.items():
+            all_preds = {}
+            all_gts = {}
+            for key, value in self.final_output.items():
                 for query in value:
-                    query["aabbs"] = [item.tolist() for item in query["aabbs"]]
-                os.makedirs(dir_name, exist_ok=True)
-                with open(f"{dir_name}/{key}.json", "w") as f:
-                    json.dump(value, f)
-
-            all_preds, all_gts = load_gt_and_pred_jsons_from_disk(dir_name, "3dvg_gt")
+                    all_preds[(key, int(query["object_id"]), int(query["ann_id"]))] = query
+                # os.makedirs(EVAL_SAVE_NAME, exist_ok=True)
+                # with open(f"{EVAL_SAVE_NAME}/{key}.json", "w") as f:
+                #     json.dump(value, f)
+                with open(os.path.join("/home/yza440/Research/D3Net/3dvg_gt", key + ".json"), 'r') as f:
+                    gt_json = json.load(f)
+                for query in gt_json:
+                    all_gts[(key, int(query["object_id"]), int(query["ann_id"]))] = query
             iou_25_results, iou_50_results = evaluate_all_scenes(all_preds, all_gts)
             self.log[phase]["scanrefer++_overall_25"] = iou_25_results["overall"]
             self.log[phase]["scanrefer++_overall_50"] = iou_50_results["overall"]
-            shutil.rmtree(dir_name)
 
 
         # check best

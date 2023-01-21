@@ -3,14 +3,17 @@ from utils import *
 from scipy.optimize import linear_sum_assignment
 import numpy as np
 import argparse
-import json
 from tqdm import tqdm
+import re
 
 EVALUATION_TYPES = {
-    "unique_inst_unique_gt": 0,
-    "multi_insts_unique_gt": 1,
-    "multi_insts_multi_gts": 2,
-    "zero_gt": 3
+
+    "zt_wo_d": 3,
+    "zt_w_d": 4,
+    "st_wo_d": 0,
+    "st_w_d": 1,
+    "mt": 2,
+
 }
 
 # SEM_LABELS = {3: 'cabinet', 4: 'bed', 5: 'chair', 6: 'sofa', 7: 'table', 8: 'door', 9: 'window', 10: 'bookshelf',
@@ -85,13 +88,19 @@ def evaluate_one_query(pred_info, gt_info):
             iou_50_tp += 1
 
     # calculate precision, recall and f1-score for the current scene
-    iou_25_f1_score = (2 * iou_25_tp + np.finfo(float).eps) / (pred_bboxes_count + gt_bboxes_count + np.finfo(float).eps)
-    iou_50_f1_score = (2 * iou_50_tp + np.finfo(float).eps) / (pred_bboxes_count + gt_bboxes_count + np.finfo(float).eps)
+    iou_25_f1_score = 2 * iou_25_tp / (pred_bboxes_count + gt_bboxes_count)
+    iou_50_f1_score = 2 * iou_50_tp / (pred_bboxes_count + gt_bboxes_count)
     return iou_25_f1_score, iou_50_f1_score
+
+
+def evaluate_one_zero_gt_query(pred_info):
+    return 1 if len(pred_info["aabbs"]) == 0 else 0
 
 
 def evaluate_all_scenes(all_pred_info, all_gt_info, scenes_info=None):
     all_gt_info_len = len(all_gt_info)
+
+    #assert len(all_pred_info) == all_gt_info_len
 
 
     eval_type_mask = np.zeros(all_gt_info_len, dtype=np.uint8)
@@ -102,18 +111,15 @@ def evaluate_all_scenes(all_pred_info, all_gt_info, scenes_info=None):
     for i, (key, value) in enumerate(tqdm(all_pred_info.items())):
         eval_type_mask[i] = all_gt_info[key]["eval_type"]
         # sem_label_class_mask[i] = all_gt_info[key]["sem_label"]
-        iou_25_f1_score, iou_50_f1_score = evaluate_one_query(value, all_gt_info[key])
-        iou_25_f1_scores[i] = iou_25_f1_score
-        iou_50_f1_scores[i] = iou_50_f1_score
+        if all_gt_info[key]["eval_type"] in (EVALUATION_TYPES["zt_wo_d"], EVALUATION_TYPES["zt_w_d"]):
+            iou_25_f1_scores[i] = iou_50_f1_scores[i] = evaluate_one_zero_gt_query(value)
+        else:
+            iou_25_f1_scores[i], iou_50_f1_scores[i] = evaluate_one_query(value, all_gt_info[key])
 
     iou_25_results = {}
     iou_50_results = {}
 
-    iou_25_overall_overall_count = []
-    iou_50_overall_overall_count = []
-
-    for sub_group in EVALUATION_TYPES.values():
-
+    for sub_group in (3, 4, 0, 1, 2):
         selected_indices = eval_type_mask == sub_group
         if np.any(selected_indices):
             # micro-averaged scores of each semantic class and each subtype across queries
@@ -154,49 +160,44 @@ def evaluate_all_scenes(all_pred_info, all_gt_info, scenes_info=None):
 
 
 def print_evaluation_results(title, iou_25_results, iou_50_results):
-    print(f"{'=' * 82}\n|{'{:^80s}'.format(title)}|\n{'=' * 82}")
-    print('{0:<15}{1:<15}{2:<15}{3:<15}{4:<15}{5:<15}'.format("", "unique_inst", "multi_insts", "multi_insts", "", ""))
-    print('{0:<15}{1:<15}{2:<15}{3:<15}{4:<15}{5:<15}'.format("IoU", "unique_gt", "unique_gt", "multi_gts", "zero gt", "overall"))
+    print(f"{'=' * 100}\n|{'{:^98s}'.format(title)}|\n{'=' * 100}")
+    print('{0:<15}{1:<15}{2:<15}{3:<15}{4:<15}{5:<15}{6:<15}'.format("IoU", "zt_wo_d", "zt_w_d", "st_wo_d", "st_w_d", "mt", "overall"))
 
     # hard code for statistics
-    groups = {0: [], 1: [], 2: [], 3: [], "overall": []}
+    #groups = {0: [], 1: [], 2: [], 3: [], "overall": []}
 
     line_1_str = '{:<15}'.format("0.25")
 
     for sub_group_type, score in iou_25_results.items():
-        line_1_str += '{:<15.3f}'.format(score)
+        line_1_str += '{:<15.1f}'.format(score * 100)
         # hard code for statistics
-        groups[sub_group_type].append(str(round(score, 3)))
+        #groups[sub_group_type].append(str(round(score, 3)))
     print(line_1_str)
 
     line_2_str = '{:<15}'.format("0.50")
 
     for sub_group_type, score in iou_50_results.items():
-        line_2_str += '{:<15.3f}'.format(score)
+        line_2_str += '{:<15.1f}'.format(score * 100)
         # hard code for statistics
-        groups[sub_group_type].append(str(round(score, 3)))
+        # groups[sub_group_type].append(str(round(score, 3)))
     print(line_2_str)
-    print(f"{'=' * 82}\n")
-    import re
+    print(f"{'=' * 100}\n")
+
     latex1 = re.sub(' +', ' & ', line_1_str[15:])
 
     latex2 = re.sub(' +', ' & ', line_2_str[15:])
 
-    print(latex1 + latex2)
 
-def read_json_from_file(json_path):
-    with open(json_path, 'r') as f:
-        data = json.load(f)
-    return data
+    print(latex1 + latex2)
 
 
 def load_gt_and_pred_jsons_from_disk(pred_paths, gt_paths):
     all_preds = {}
     all_gts = {}
     filenames = os.listdir(pred_paths)
-    # if set(filenames) != set(os.listdir(gt_paths)):
-    #     print("Prediction and GT json files don't match.")
-    #     exit(0)
+    if set(filenames) != set(os.listdir(gt_paths)):
+        print("Prediction and GT json files don't match.")
+        exit(0)
     for filename in filenames:
         pred_json = read_json_from_file(os.path.join(pred_paths, filename))
         gt_json = read_json_from_file(os.path.join(gt_paths, filename))
