@@ -242,13 +242,22 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
                     multi_pred_bboxes = []
                     multi_pred_ref_idxs = pred_ref_mul_obj_mask[i][j].nonzero()
                     for idx in multi_pred_ref_idxs[0]:
-                        pred_obb = config.param2obb(
-                            pred_center[i, idx, 0:3].detach().cpu().numpy(),
-                            pred_heading_class[i, idx].detach().cpu().numpy(),
-                            pred_heading_residual[i, idx].detach().cpu().numpy(),
-                            pred_size_class[i, idx].detach().cpu().numpy(),
-                            pred_size_residual[i, idx].detach().cpu().numpy()
-                        )
+                        if USE_GT:
+                            pred_obb = config.param2obb(
+                                data_dict["center_label"][i, idx,0:3].cpu().numpy(),
+                                data_dict["heading_class_label"][i, idx].cpu().numpy(),
+                                data_dict["heading_residual_label"][i, idx].cpu().numpy(),
+                                data_dict["size_class_label"][i, idx].cpu().numpy(),
+                                data_dict["size_residual_label"][i, idx].cpu().numpy()
+                            )
+                        else:
+                            pred_obb = config.param2obb(
+                                pred_center[i, idx, 0:3].detach().cpu().numpy(),
+                                pred_heading_class[i, idx].detach().cpu().numpy(),
+                                pred_heading_residual[i, idx].detach().cpu().numpy(),
+                                pred_size_class[i, idx].detach().cpu().numpy(),
+                                pred_size_residual[i, idx].detach().cpu().numpy()
+                            )
                         # pred_bbox = get_3d_box(pred_obb[3:6], pred_obb[6], pred_obb[0:3])
                         pred_bbox = construct_bbox_corners(pred_obb[0:3], pred_obb[3:6])
                         multi_pred_bboxes.append(pred_bbox)
