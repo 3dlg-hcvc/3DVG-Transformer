@@ -7,9 +7,11 @@ Usage example: python ./batch_load_scannet_data.py
 """
 
 import os
+import random
 import sys
 import datetime
 import numpy as np
+import torch.random
 from load_scannet_data import export
 from functools import partial
 from tqdm.contrib.concurrent import process_map
@@ -19,8 +21,7 @@ LABEL_MAP_FILE = 'meta_data/scannetv2-labels.combined.tsv'
 DONOTCARE_CLASS_IDS = np.array([])
 OBJ_CLASS_IDS = np.array([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]) # exclude wall (1), floor (2), ceiling (22)
 MAX_NUM_POINT = 50000
-SCANREFER_PLUS_PLUS = False
-OUTPUT_FOLDER = './scannet_data++'
+OUTPUT_FOLDER = './scannet_data'
 
 def export_one_scan(scan_name):
     output_filename_prefix = os.path.join(OUTPUT_FOLDER, scan_name)
@@ -49,7 +50,7 @@ def export_one_scan(scan_name):
         print("No semantic/instance annotation for test scenes")
 
     N = mesh_vertices.shape[0]
-    if N > MAX_NUM_POINT and not SCANREFER_PLUS_PLUS:
+    if N > MAX_NUM_POINT:
         choices = np.random.choice(N, MAX_NUM_POINT, replace=False)
         mesh_vertices = mesh_vertices[choices, :]
         aligned_vertices = aligned_vertices[choices, :]
@@ -66,6 +67,10 @@ def export_one_scan(scan_name):
     np.save(output_filename_prefix+'_aligned_bbox.npy', aligned_instance_bboxes)
 
 def batch_export():
+    np.random.seed(123)
+    random.seed(123)
+    torch.manual_seed(123)
+    torch.cuda.manual_seed_all(123)
     if not os.path.exists(OUTPUT_FOLDER):
         print('Creating new data folder: {}'.format(OUTPUT_FOLDER))                
         os.mkdir(OUTPUT_FOLDER)        

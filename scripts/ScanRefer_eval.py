@@ -2,7 +2,7 @@ import sys
 
 import pickle
 import torch
-
+import json
 from torch.utils.data._utils.collate import default_collate
 import os
 from torch.utils.data import DataLoader
@@ -577,13 +577,13 @@ if __name__ == "__main__":
     parser.add_argument("--reference", action="store_true", help="evaluate the reference localization results")
     parser.add_argument("--detection", action="store_true", help="evaluate the object detection results")
     parser.add_argument("--split", default="val")
-    parser.add_argument("--vanilla", action="store_true", default=False)
-    parser.add_argument("--loss", default=0.5)
-    parser.add_argument("--eval", default=0.1)
+    # parser.add_argument("--vanilla", action="store_true", default=False)
+    # parser.add_argument("--loss", default=0.5)
+    # parser.add_argument("--eval", default=0.1)
     args = parser.parse_args()
-    SCANREFER_ENHANCE_VANILLE = args.vanilla
-    SCANREFER_ENHANCE_LOSS_THRESHOLD = args.loss
-    SCANREFER_ENHANCE_EVAL_THRESHOLD = args.eval
+    # SCANREFER_ENHANCE_VANILLE = args.vanilla
+    # SCANREFER_ENHANCE_LOSS_THRESHOLD = args.loss
+    # SCANREFER_ENHANCE_EVAL_THRESHOLD = args.eval
 
     # evaluate
     if args.reference:

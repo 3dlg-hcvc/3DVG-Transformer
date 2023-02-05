@@ -152,12 +152,12 @@ class MultiHeadAttention(nn.Module):
             self.register_state('running_values', torch.zeros((0, d_model)))
 
     def forward(self, queries, keys, values, attention_mask=None, attention_weights=None, way='mul'):
-        if self.can_be_stateful and self._is_stateful:
-            self.running_keys = torch.cat([self.running_keys, keys], 1)
-            keys = self.running_keys
-
-            self.running_values = torch.cat([self.running_values, values], 1)
-            values = self.running_values
+        # if self.can_be_stateful and self._is_stateful:
+        #     self.running_keys = torch.cat([self.running_keys, keys], 1)
+        #     keys = self.running_keys
+        #
+        #     self.running_values = torch.cat([self.running_values, values], 1)
+        #     values = self.running_values
 
         if self.identity_map_reordering:
             q_norm = self.layer_norm(queries)

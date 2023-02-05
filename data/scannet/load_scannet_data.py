@@ -171,6 +171,5 @@ def main():
     meta_file = os.path.join(opt.scan_path, scan_name + '.txt') # includes axisAlignment info for the train set scans.
     export(mesh_file, agg_file, seg_file, meta_file, opt.label_map_file, opt.output_file)
 
-
 if __name__ == '__main__':
     main()
