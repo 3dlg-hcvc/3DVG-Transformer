@@ -5,6 +5,7 @@ import numpy as np
 import argparse
 from tqdm import tqdm
 import re
+import json
 
 EVALUATION_TYPES = {
 
@@ -15,7 +16,10 @@ EVALUATION_TYPES = {
     "mt": 2,
 
 }
-
+def read_json_from_file(json_path):
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    return data
 # SEM_LABELS = {3: 'cabinet', 4: 'bed', 5: 'chair', 6: 'sofa', 7: 'table', 8: 'door', 9: 'window', 10: 'bookshelf',
 #               11: 'picture',
 #               12: 'counter', 14: 'desk', 16: 'curtain', 24: 'refrigerator', 28: 'shower curtain', 33: 'toilet',
@@ -109,9 +113,9 @@ def evaluate_all_scenes(all_pred_info, all_gt_info, scenes_info=None):
     iou_50_f1_scores = np.zeros(all_gt_info_len)
 
     for i, (key, value) in enumerate(tqdm(all_pred_info.items())):
-        eval_type_mask[i] = all_gt_info[key]["eval_type"]
+        eval_type_mask[i] = EVALUATION_TYPES[all_gt_info[key]["eval_type"]]
         # sem_label_class_mask[i] = all_gt_info[key]["sem_label"]
-        if all_gt_info[key]["eval_type"] in (EVALUATION_TYPES["zt_wo_d"], EVALUATION_TYPES["zt_w_d"]):
+        if all_gt_info[key]["eval_type"] in ("zt_wo_d", "zt_w_d"):
             iou_25_f1_scores[i] = iou_50_f1_scores[i] = evaluate_one_zero_gt_query(value)
         else:
             iou_25_f1_scores[i], iou_50_f1_scores[i] = evaluate_one_query(value, all_gt_info[key])
@@ -119,7 +123,7 @@ def evaluate_all_scenes(all_pred_info, all_gt_info, scenes_info=None):
     iou_25_results = {}
     iou_50_results = {}
 
-    for sub_group in (3, 4, 0, 1, 2):
+    for sub_group in (4, 3, 1, 0, 2):
         selected_indices = eval_type_mask == sub_group
         if np.any(selected_indices):
             # micro-averaged scores of each semantic class and each subtype across queries
@@ -161,7 +165,7 @@ def evaluate_all_scenes(all_pred_info, all_gt_info, scenes_info=None):
 
 def print_evaluation_results(title, iou_25_results, iou_50_results):
     print(f"{'=' * 100}\n|{'{:^98s}'.format(title)}|\n{'=' * 100}")
-    print('{0:<15}{1:<15}{2:<15}{3:<15}{4:<15}{5:<15}{6:<15}'.format("IoU", "zt_wo_d", "zt_w_d", "st_wo_d", "st_w_d", "mt", "overall"))
+    print('{0:<15}{1:<15}{2:<15}{3:<15}{4:<15}{5:<15}{6:<15}'.format("IoU", "zt_w_d", "zt_wo_d", "st_w_d", "st_wo_d", "mt", "overall"))
 
     # hard code for statistics
     #groups = {0: [], 1: [], 2: [], 3: [], "overall": []}
