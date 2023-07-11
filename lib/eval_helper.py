@@ -13,7 +13,6 @@ from utils.nn_distance import nn_distance, huber_loss
 from lib.ap_helper import parse_predictions
 from lib.loss import SoftmaxRankingLoss
 from utils.box_util import get_3d_box, get_3d_box_batch, box3d_iou
-from lib.scanrefer_plus_eval_helper import *
 
 from macro import *
 def eval_ref_one_sample(pred_bbox, gt_bbox):
@@ -306,3 +305,179 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
         data_dict["sem_acc"] = (sem_match * data_dict["pred_mask"]).sum() / data_dict["pred_mask"].sum()
 
     return data_dict
+
+
+def get_eval_multi3drefer(data_dict, config):
+    batch_size, lang_chunk_size = data_dict["ann_id"].shape
+
+    pred_aabb_score_masks = (
+            torch.sigmoid(data_dict["cluster_ref"]) >= 0.1
+    ).reshape(shape=(batch_size, lang_chunk_size, -1)).cpu().numpy()
+
+    pred_results = {}
+
+    pred_center = data_dict['center'].detach().cpu().numpy()  # (B,K,3)
+    pred_heading_class = torch.argmax(data_dict['heading_scores'], -1)  # B,num_proposal
+    pred_heading_residual = torch.gather(data_dict['heading_residuals'], 2,
+                                         pred_heading_class.unsqueeze(-1))  # B,num_proposal,1
+    pred_heading_class = pred_heading_class.detach().cpu().numpy()  # B,num_proposal
+    pred_heading_residual = pred_heading_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal
+    pred_size_class = torch.argmax(data_dict['size_scores'], -1)  # B,num_proposal
+    pred_size_residual = torch.gather(data_dict['size_residuals'], 2,
+                                      pred_size_class.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 1,
+                                                                                         3))  # B,num_proposal,1,3
+    pred_size_class = pred_size_class.detach().cpu().numpy()
+    pred_size_residual = pred_size_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal,3
+    gts = {}
+    new_box_mask = data_dict["multi_ref_box_label_list"]
+
+    for i in range(batch_size):
+
+        pred_obb_batch = config.param2obb_batch(pred_center[i, :, 0:3], pred_heading_class[i],
+                                                pred_heading_residual[i],
+                                                pred_size_class[i], pred_size_residual[i])
+        pred_bbox_corners = get_3d_box_batch(pred_obb_batch[:, 3:6], pred_obb_batch[:, 6], pred_obb_batch[:, 0:3])
+        min_max_bound = np.stack((pred_bbox_corners.min(1), pred_bbox_corners.max(1)), axis=1)
+
+        for j in range(lang_chunk_size):
+            if j < data_dict["lang_num"][i]:
+                pred_aabbs = min_max_bound[pred_aabb_score_masks[i, j]]
+                pred_results[
+                    (data_dict["scene_id"][i], data_dict["object_id"][i][j].item(),
+                     data_dict["ann_id"][i][j].item())
+                ] = {
+                    "aabb_bound": pred_aabbs
+                }
+
+                single_box_mask = new_box_mask[i][j]
+
+                gt_bboxes_centers = data_dict["center_label"][i][single_box_mask].cpu().numpy()
+                gt_heading_class_labels = data_dict["heading_class_label"][i][single_box_mask].cpu().numpy()
+                gt_heading_residual_labels = data_dict["heading_residual_label"][i][single_box_mask].cpu().numpy()
+                gt_size_class_labels = data_dict["size_class_label"][i][single_box_mask].cpu().numpy()
+                gt_bboxes_residuals = data_dict["size_residual_label"][i][single_box_mask].cpu().numpy()
+
+                gt_obb_batch_new = config.param2obb_batch(gt_bboxes_centers[:, 0:3], gt_heading_class_labels,
+                                                          gt_heading_residual_labels,
+                                                          gt_size_class_labels, gt_bboxes_residuals)
+
+                gt_bbox_batch_new = get_3d_box_batch(gt_obb_batch_new[:, 3:6], gt_obb_batch_new[:, 6],
+                                                     gt_obb_batch_new[:, 0:3])
+
+                # gt_bboxes = gt_bboxes_list[i][single_mask]
+                gt_bboxes_bound = np.stack((gt_bbox_batch_new.min(1), gt_bbox_batch_new.max(1)), axis=1)
+
+                gts[
+                    (data_dict["scene_id"][i], data_dict["object_id"][i][j].item(),
+                     data_dict["ann_id"][i][j].item())
+                ] = {
+                    "aabb_bound": gt_bboxes_bound,
+                    "eval_type": data_dict["eval_type"][j][i]
+                }
+
+
+    # batch_size = len(data_dict["scene_id"])
+    # chunk_size = data_dict["ann_id"].shape[1]
+    # box_masks = data_dict["multi_ref_box_label_list"]
+
+    # gt_bboxes_list = data_dict["gt_bbox"]
+
+
+
+    # gt_target_obj_id_masks = data_dict["gt_target_obj_id_mask"].permute(1, 0)FF
+    # for i in range(batch_size):
+    #     # aabb_start_idx = data_dict["aabb_count_offsets"][i]
+    #     # aabb_end_idx = data_dict["aabb_count_offsets"][i + 1]
+    #
+    #
+    #     for j in range(chunk_size):
+    #
+    #         if j < data_dict["lang_num"][i]:
+
+    return pred_results, gts
+
+    # objectness_preds_batch = torch.argmax(data_dict['objectness_scores'], 2).long()
+    # pred_masks = (objectness_preds_batch == 1).float()
+    #
+    # gt_center_list = torch.einsum("abc,adb->adc", data_dict["center_label"],
+    #                               data_dict["ref_box_label_list"].to(torch.float32))
+    #
+    # batch_size, len_nun_max = gt_center_list.shape[:2]
+    #
+    # pred_ref_mul_obj_mask = torch.logical_and(
+    #     (torch.sigmoid(data_dict["cluster_ref"]) >= SCANREFER_ENHANCE_EVAL_THRESHOLD),
+    #     pred_masks.bool().repeat(1, len_nun_max).reshape(batch_size * len_nun_max, -1)).cpu().numpy()
+    #
+    # pred_ref_mul_obj_mask = pred_ref_mul_obj_mask.reshape(batch_size, len_nun_max, -1)
+    #
+    # lang_num = data_dict["lang_num"]
+    #
+    # pred_mask1 = pred_masks[0].repeat(len_nun_max, 1)
+    # for i in range(batch_size):
+    #     if i != 0:
+    #         pred_mask = pred_masks[i].repeat(len_nun_max, 1)
+    #         pred_mask1 = torch.cat([pred_mask1, pred_mask], dim=0)
+    # pred_ref = torch.argmax(data_dict['cluster_ref'] * pred_mask1, 1)
+    #
+    # pred_ref = pred_ref.reshape(batch_size, len_nun_max)
+    # pred_center = data_dict['center']  # (B,K,3)
+    #
+    # gt_ref = torch.argmax(data_dict["ref_box_label_list"], -1)
+    #
+    # pred_heading_class = torch.argmax(data_dict['heading_scores'], -1)  # B,num_proposal
+    # pred_heading_residual = torch.gather(data_dict['heading_residuals'], 2,
+    #                                      pred_heading_class.unsqueeze(-1))  # B,num_proposal,1
+    # pred_heading_class = pred_heading_class  # B,num_proposal
+    # pred_heading_residual = pred_heading_residual.squeeze(2)  # B,num_proposal
+    # pred_size_class = torch.argmax(data_dict['size_scores'], -1)  # B,num_proposal
+    # pred_size_residual = torch.gather(data_dict['size_residuals'], 2,
+    #                                   pred_size_class.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 1,
+    #                                                                                      3))  # B,num_proposal,1,3
+    # pred_size_class = pred_size_class
+    # pred_size_residual = pred_size_residual.squeeze(2)  # B,num_proposal,3
+    # pred_dict = {}
+    # for i in range(batch_size):
+    #     # compute the iou
+    #     for j in range(len_nun_max):
+    #         if j < lang_num[i]:
+    #             pred_ref_idx, gt_ref_idx = pred_ref[i][j], gt_ref[i][j]
+    #             pred_obb = config.param2obb(
+    #                 pred_center[i, pred_ref_idx, 0:3].detach().cpu().numpy(),
+    #                 pred_heading_class[i, pred_ref_idx].detach().cpu().numpy(),
+    #                 pred_heading_residual[i, pred_ref_idx].detach().cpu().numpy(),
+    #                 pred_size_class[i, pred_ref_idx].detach().cpu().numpy(),
+    #                 pred_size_residual[i, pred_ref_idx].detach().cpu().numpy()
+    #             )
+    #
+    #             multi_pred_bboxes = []
+    #             multi_pred_ref_idxs = pred_ref_mul_obj_mask[i][j].nonzero()
+    #             for idx in multi_pred_ref_idxs[0]:
+    #                 if USE_GT:
+    #                     pred_obb = config.param2obb(
+    #                         data_dict["center_label"][i, idx, 0:3].cpu().numpy(),
+    #                         data_dict["heading_class_label"][i, idx].cpu().numpy(),
+    #                         data_dict["heading_residual_label"][i, idx].cpu().numpy(),
+    #                         data_dict["size_class_label"][i, idx].cpu().numpy(),
+    #                         data_dict["size_residual_label"][i, idx].cpu().numpy()
+    #                     )
+    #                 else:
+    #                     pred_obb = config.param2obb(
+    #                         pred_center[i, idx, 0:3].detach().cpu().numpy(),
+    #                         pred_heading_class[i, idx].detach().cpu().numpy(),
+    #                         pred_heading_residual[i, idx].detach().cpu().numpy(),
+    #                         pred_size_class[i, idx].detach().cpu().numpy(),
+    #                         pred_size_residual[i, idx].detach().cpu().numpy()
+    #                     )
+    #                 # pred_bbox = get_3d_box(pred_obb[3:6], pred_obb[6], pred_obb[0:3])
+    #                 pred_bbox = construct_bbox_corners(pred_obb[0:3], pred_obb[3:6])
+    #                 multi_pred_bboxes.append(pred_bbox)
+    #
+    #             pred_dict[(data_dict["scene_id"][i].item(), data_dict["object_id"][i][j].item(), data_dict["ann_id"][i][j].item())] = {
+    #
+    #             }
+    #             output_info = {
+    #                 "scene_id": data_dict["scene_id"][i].item(),
+    #                 "object_id": data_dict["object_id"][i][j].item(),
+    #                 "ann_id": data_dict["ann_id"][i][j].item(),
+    #                 "aabbs": multi_pred_bboxes
+    #             }

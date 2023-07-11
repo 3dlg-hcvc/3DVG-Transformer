@@ -137,7 +137,7 @@ class ScannetReferenceDataset(Dataset):
 
 
     def __getitem__(self, idx):
-        start = time.time()
+        # start = time.time()
 
         # self.shuffle_data()
         # random.shuffle(self.scanrefer_new[idx])
@@ -148,6 +148,7 @@ class ScannetReferenceDataset(Dataset):
         scene_id = self.scanrefer_new[idx][0]["scene_id"]
 
         object_id_list = []
+        eval_type_list = []
 
         # scanrefer++ support
         multi_obj_ids_list = []
@@ -166,6 +167,7 @@ class ScannetReferenceDataset(Dataset):
         for i in range(self.lang_num_max):
             if i < lang_num:
                 object_id = int(self.scanrefer_new[idx][i]["object_id"])
+                eval_type = self.scanrefer_new[idx][i]["eval_type"]
 
                 if SCANREFER_ENHANCE:
                     # scanrefer++ support
@@ -174,14 +176,15 @@ class ScannetReferenceDataset(Dataset):
                 object_name = " ".join(self.scanrefer_new[idx][i]["object_name"].split("_"))
                 ann_id = self.scanrefer_new[idx][i]["ann_id"]
 
-                lang_feat = self.lang[scene_id][str(object_id)][ann_id]
+                lang_feat = self.lang[scene_id][int(object_id)][ann_id]
                 lang_len = len(self.scanrefer_new[idx][i]["token"])
                 lang_len = lang_len if lang_len <= CONF.TRAIN.MAX_DES_LEN else CONF.TRAIN.MAX_DES_LEN
                 # main_lang_feat = self.lang_main[scene_id][str(object_id)][ann_id]["main"]
-                main_lang_len = self.lang_main[scene_id][str(object_id)][ann_id]["len"]
-                first_obj = self.lang_main[scene_id][str(object_id)][ann_id]["first_obj"]
-                unk = self.lang_main[scene_id][str(object_id)][ann_id]["unk"]
+                main_lang_len = self.lang_main[scene_id][int(object_id)][ann_id]["len"]
+                first_obj = self.lang_main[scene_id][int(object_id)][ann_id]["first_obj"]
+                unk = self.lang_main[scene_id][int(object_id)][ann_id]["unk"]
 
+            eval_type_list.append(eval_type)
             object_id_list.append(object_id)
 
             if SCANREFER_ENHANCE:
@@ -439,8 +442,9 @@ class ScannetReferenceDataset(Dataset):
         # data_dict["ref_size_residual_label_list"] = np.array(ref_size_residual_label_list).astype(np.float32)
         data_dict["object_cat_list"] = np.array(object_cat_list).astype(np.int64)
         data_dict["object_id"] = np.array(object_id_list).astype(np.int64)
-        data_dict["ann_id"] = np.array(ann_id_list).astype(np.int64)
 
+        data_dict["ann_id"] = np.array(ann_id_list).astype(np.int64)
+        data_dict["eval_type"] = eval_type_list
         data_dict["gt_box_num_list"] = np.array(gt_box_num_list).astype(np.int32)
 
         data_dict["instance_ids"] = instance_labels.astype(np.int32)
@@ -449,13 +453,13 @@ class ScannetReferenceDataset(Dataset):
             data_dict["multi_ref_box_label_list"] = np.array(multi_ref_box_label_list)
 
 
-        unique_multiple_list = []
-        for i in range(self.lang_num_max):
-            object_id = object_id_list[i]
-            ann_id = ann_id_list[i]
-            unique_multiple = self.unique_multiple_lookup[scene_id][str(object_id)][ann_id]
-            unique_multiple_list.append(unique_multiple)
-        data_dict["unique_multiple_list"] = np.array(unique_multiple_list).astype(np.int64)
+        # unique_multiple_list = []
+        # for i in range(self.lang_num_max):
+        #     object_id = object_id_list[i]
+        #     ann_id = ann_id_list[i]
+        #     unique_multiple = self.unique_multiple_lookup[scene_id][str(object_id)][ann_id]
+        #     unique_multiple_list.append(unique_multiple)
+        # data_dict["unique_multiple_list"] = np.array(unique_multiple_list).astype(np.int64)
 
         return data_dict
     

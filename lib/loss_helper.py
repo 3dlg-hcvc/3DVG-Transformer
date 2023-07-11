@@ -284,7 +284,7 @@ def compute_reference_loss(data_dict, config, no_reference=False):
     if not no_reference:
         cluster_preds = data_dict["cluster_ref"].reshape(batch_size, len_nun_max, num_proposals)
     else:
-        cluster_preds = torch.zeros(batch_size, len_nun_max, num_proposals).cuda()
+        cluster_preds = torch.zeros(size=(batch_size, len_nun_max, num_proposals), device="cuda")
 
     # print("cluster_preds",cluster_preds.shape)
     if not SCANREFER_ENHANCE:
@@ -366,7 +366,7 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                             if (iou_matrix[row_idx[index], col_idx[index]] * -1) >= SCANREFER_ENHANCE_LOSS_THRESHOLD:
                                 labels_new[j, col_idx[index]] = 1
 
-        cluster_labels = torch.FloatTensor(labels_new).cuda()  # B proposals
+        cluster_labels = torch.cuda.FloatTensor(labels_new)  # B proposals
         gt_labels[i] = labels_new
         # reference loss
         loss += criterion(cluster_preds[i, :lang_num[i]], cluster_labels[:lang_num[i]].float().clone())
@@ -375,7 +375,7 @@ def compute_reference_loss(data_dict, config, no_reference=False):
     data_dict['max_iou_rate_0.5'] = max_iou_rate_5 / sum(lang_num.cpu().numpy())
 
     # print("max_iou_rate", data_dict['max_iou_rate_0.25'], data_dict['max_iou_rate_0.5'])
-    cluster_labels = torch.FloatTensor(gt_labels).cuda()  # B len_nun_max proposals
+    cluster_labels = torch.cuda.FloatTensor(gt_labels)  # B len_nun_max proposals
     # print("cluster_labels", cluster_labels.shape)
     loss = loss / batch_size
     # print("ref_loss", loss)
