@@ -4,14 +4,12 @@ Author: Dave Zhenyu Chen (zhenyu.chen@tum.de)
 '''
 
 
-import time
+import os
 import torch
-from tensorboardX import SummaryWriter
 from torch.optim.lr_scheduler import StepLR, MultiStepLR, CosineAnnealingLR
 from lib.config import CONF
 from lib.loss_helper import get_loss
 from lib.eval_helper import get_eval, get_eval_multi3drefer
-from utils.eta import decode_eta
 from lib.pointnet2.pytorch_utils import BNMomentumScheduler
 from macro import *
 from lib.multi3drefer_evaluator import Multi3DReferEvaluator
@@ -368,6 +366,8 @@ class Solver():
         #     mem_hash = {}
         total_pred = {}
         total_gt = {}
+
+        best_model_f1 = 0
         for i, data_dict in enumerate(tqdm(dataloader)):
             # move to cuda
             for key in data_dict:
@@ -495,6 +495,12 @@ class Solver():
             for metric_name, result in results.items():
                 for breakdown, value in result.items():
                     wandb.log({f"val_eval/{metric_name}_{breakdown}": value})
+                    if metric_name == "f1@0.5" and breakdown == "overall":
+                        if value >= best_model_f1:
+                            best_model_f1 = value
+                            model_root = os.path.join(CONF.PATH.OUTPUT, self.stamp)
+                            torch.save(self.model.state_dict(), os.path.join(model_root, "model.pth"))
+
 
 
         # # check best
