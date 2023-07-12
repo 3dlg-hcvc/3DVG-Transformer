@@ -111,7 +111,7 @@ class Solver():
         self.bn_decay_rate = bn_decay_rate
 
         run = wandb.init(
-            project="3dvg"
+            project="3dvg", name=self.stamp
         )
 
         # self.best = {

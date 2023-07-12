@@ -34,7 +34,7 @@ def get_scene_list():
         return sorted(list(set(f.read().splitlines())))
 
 def to_tensor(arr):
-    return torch.Tensor(arr).cuda()
+    return torch.cuda.Tensor(arr)
 
 def resize_crop_image(image, new_image_dims):
     image_dims = [image.shape[1], image.shape[0]]

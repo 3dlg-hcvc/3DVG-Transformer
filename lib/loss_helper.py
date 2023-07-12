@@ -110,7 +110,7 @@ def compute_objectness_loss(data_dict):
 
     # Compute objectness loss
     objectness_scores = data_dict['objectness_scores']
-    criterion = nn.CrossEntropyLoss(torch.Tensor(OBJECTNESS_CLS_WEIGHTS).cuda(), reduction='none')
+    criterion = nn.CrossEntropyLoss(torch.tensor(OBJECTNESS_CLS_WEIGHTS, device="cuda"), reduction='none')
     objectness_loss = criterion(objectness_scores.transpose(2, 1), objectness_label)
     objectness_loss = torch.sum(objectness_loss * objectness_mask) / (torch.sum(objectness_mask) + 1e-6)
 
@@ -463,7 +463,7 @@ def get_loss(data_dict, config, detection=True, reference=True, use_lang_classif
         lang_count = data_dict['ref_center_label_list'].shape[1]
         # data_dict["cluster_labels"] = objectness_label.new_zeros(objectness_label.shape).cuda().repeat(lang_count, 1)
         data_dict["cluster_labels"] = cluster_labels
-        data_dict["cluster_ref"] = objectness_label.new_zeros(objectness_label.shape).float().cuda().repeat(lang_count, 1)
+        data_dict["cluster_ref"] = objectness_label.new_zeros(objectness_label.shape, device="cuda", dtype=torch.float32).repeat(lang_count, 1)
         # store
         data_dict["ref_loss"] = torch.zeros(1)[0].cuda()
         # data_dict['max_iou_rate_0.25'] = 0
