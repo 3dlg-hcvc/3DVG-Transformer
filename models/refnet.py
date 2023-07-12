@@ -7,7 +7,6 @@ from models.voting_module import VotingModule
 from models.proposal_module import ProposalModule
 from models.lang_module import LangModule
 from models.match_module import MatchModule
-from models.gt_detector import GTDetector
 from macro import *
 
 class RefNet(nn.Module):
@@ -33,35 +32,32 @@ class RefNet(nn.Module):
 
         # --------- PROPOSAL GENERATION ---------
         # Backbone point feature learning
-        if not USE_GT:
-            self.backbone_net = Pointnet2Backbone(input_feature_dim=self.input_feature_dim)
+        self.backbone_net = Pointnet2Backbone(input_feature_dim=self.input_feature_dim)
 
-            # Hough voting
-            self.vgen = VotingModule(self.vote_factor, 256)
+        # Hough voting
+        self.vgen = VotingModule(self.vote_factor, 256)
 
-            # Vote aggregation and object proposal
-            config_transformer = None
+        # Vote aggregation and object proposal
+        config_transformer = None
 
-            config_transformer = {
-                'mask': 'no_mask',
-                'weighted_input': True,
-                'transformer_type': 'myAdd_20;deformable',
-                'deformable_type': 'myAdd',
-                'position_embedding': 'none',
-                'input_dim': 0,
-                'enc_layers': 0,
-                'dec_layers': 2,
-                'dim_feedforward': 2048,
-                'hidden_dim': 288,
-                'dropout': 0.1,
-                'nheads': 8,
-                'pre_norm': False
-            }
-            self.proposal = ProposalModule(num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal,
-                                           sampling, config_transformer=config_transformer,
-                                           dataset_config=dataset_config)
-        else:
-            self.backbone_net = GTDetector()
+        config_transformer = {
+            'mask': 'no_mask',
+            'weighted_input': True,
+            'transformer_type': 'myAdd_20;deformable',
+            'deformable_type': 'myAdd',
+            'position_embedding': 'none',
+            'input_dim': 0,
+            'enc_layers': 0,
+            'dec_layers': 2,
+            'dim_feedforward': 2048,
+            'hidden_dim': 288,
+            'dropout': 0.1,
+            'nheads': 8,
+            'pre_norm': False
+        }
+        self.proposal = ProposalModule(num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal,
+                                       sampling, config_transformer=config_transformer,
+                                       dataset_config=dataset_config)
 
 
         if not no_reference:
@@ -73,12 +69,9 @@ class RefNet(nn.Module):
             # --------- PROPOSAL MATCHING ---------
             # Match the generated proposals and select the most confident ones
             # self.match = MatchModule(num_proposals=num_proposal, lang_size=(1 + int(self.use_bidir)) * hidden_size, det_channel=256*2)
-            if not USE_GT:
-                self.match = MatchModule(num_proposals=num_proposal, lang_size=(1 + int(self.use_bidir)) * hidden_size,
-                                     det_channel=config_transformer['hidden_dim'])  # bef 256
-            else:
-                self.match = MatchModule(num_proposals=num_proposal, lang_size=(1 + int(self.use_bidir)) * hidden_size,
-                                         det_channel=16)  # bef 256
+            self.match = MatchModule(num_proposals=num_proposal, lang_size=(1 + int(self.use_bidir)) * hidden_size,
+                                 det_channel=config_transformer['hidden_dim'])  # bef 256
+
 
     def forward(self, data_dict):
         """ Forward pass of the network
@@ -107,23 +100,21 @@ class RefNet(nn.Module):
 
         # --------- HOUGH VOTING ---------
 
-        if not USE_GT:
-            data_dict = self.backbone_net(data_dict)
-            # --------- HOUGH VOTING ---------
-            xyz = data_dict["fp2_xyz"]
-            features = data_dict["fp2_features"]
-            data_dict["seed_inds"] = data_dict["fp2_inds"]
-            data_dict["seed_xyz"] = xyz
-            data_dict["seed_features"] = features
+        data_dict = self.backbone_net(data_dict)
+        # --------- HOUGH VOTING ---------
+        xyz = data_dict["fp2_xyz"]
+        features = data_dict["fp2_features"]
+        data_dict["seed_inds"] = data_dict["fp2_inds"]
+        data_dict["seed_xyz"] = xyz
+        data_dict["seed_features"] = features
 
-            xyz, features = self.vgen(xyz, features)
-            features_norm = torch.norm(features, p=2, dim=1)
-            features = features.div(features_norm.unsqueeze(1))
-            data_dict["vote_xyz"] = xyz
-            data_dict["vote_features"] = features
-            data_dict = self.proposal(xyz, features, data_dict)
-        else:
-            data_dict = self.backbone_net.feed(data_dict)
+        xyz, features = self.vgen(xyz, features)
+        features_norm = torch.norm(features, p=2, dim=1)
+        features = features.div(features_norm.unsqueeze(1))
+        data_dict["vote_xyz"] = xyz
+        data_dict["vote_features"] = features
+        data_dict = self.proposal(xyz, features, data_dict)
+
         # --------- PROPOSAL GENERATION ---------
 
 

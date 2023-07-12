@@ -50,7 +50,7 @@ def get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, split, config
     )
     # dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle, num_workers=0, pin_memory=True)
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle, num_workers=4, pin_memory=True)
 
     return dataset, dataloader
 
