@@ -399,15 +399,15 @@ class ScannetReferenceDataset(Dataset):
             istrain = 1
 
         data_dict = {}
-        if USE_GT:
-            scale = 50
-            scaled_points = point_cloud[:, :3] * scale
-            scaled_points -= scaled_points.min(0)
-            data_dict["locs_scaled"] = scaled_points.astype(np.float32)
-            gt_proposals_idx, gt_proposals_offset, _ = self._generate_gt_clusters(
-                point_cloud[:, :3], instance_labels, semantic_labels)
-            data_dict["gt_proposals_idx"] = gt_proposals_idx
-            data_dict["gt_proposals_offset"] = gt_proposals_offset
+        # if USE_GT:
+        #     scale = 50
+        #     scaled_points = point_cloud[:, :3] * scale
+        #     scaled_points -= scaled_points.min(0)
+        #     data_dict["locs_scaled"] = scaled_points.astype(np.float32)
+        #     gt_proposals_idx, gt_proposals_offset, _ = self._generate_gt_clusters(
+        #         point_cloud[:, :3], instance_labels, semantic_labels)
+        #     data_dict["gt_proposals_idx"] = gt_proposals_idx
+        #     data_dict["gt_proposals_offset"] = gt_proposals_offset
 
         data_dict["point_clouds"] = point_cloud.astype(np.float32) # point cloud data including features
         data_dict["unk"] = unk.astype(np.float32) # from glove
