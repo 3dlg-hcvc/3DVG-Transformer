@@ -3,11 +3,12 @@
 DETR model and criterion classes.
 """
 import torch
+import numpy as np
 import torch.nn.functional as F
 from torch import nn
-
+from macro import *
 from .transformer3D import build_transformer, MLP
-
+from utils.nn_distance import nn_distance
 
 class DETR3D(nn.Module):  # just as a backbone; encoding afterward
     """ This is the DETR module that performs object detection """
@@ -62,7 +63,7 @@ class DETR3D(nn.Module):  # just as a backbone; encoding afterward
         #    self.pos_embd = build_position_encoding(config_transformer.position_embedding, hidden_dim, config_transformer.input_dim)
         self.aux_loss = aux_loss
 
-    def forward(self, xyz, features, output, seed_xyz=None, seed_features=None, decode_vars=None):  # insert into output
+    def forward(self, xyz, features, output, seed_xyz=None, seed_features=None, decode_vars=None, config=None):  # insert into output
         """ The forward expects a Dict, which consists of:
                - input.xyz: [batch_size x N x K]
                - input.features: [batch_size x N x C]
@@ -83,39 +84,42 @@ class DETR3D(nn.Module):  # just as a backbone; encoding afterward
         # import ipdb; ipdb.set_trace()
         # GET MASK
 
-        if self.mask_type == 'detr_mask':
-            mask = torch.zeros(B, N).bool().to(xyz.device)
-            src_mask = None
-        elif self.mask_type == 'no_mask':
-            mask = None
-            src_mask = None
-        elif self.mask_type.split('_')[0] == 'near':
-            near_kth = int(self.mask_type.split('_')[1])
-            # print('mask_type: get nearest kth', near_kth, flush=True)
-            mask = None
-            # mask = torch.zeros(B, N).bool().to(xyz.device)
-            src_mask = torch.zeros(B, N, N).to(xyz.device) - 1e9
-            A = xyz[:, None, :, :].repeat(1, N, 1, 1)
-            B = xyz[:, :, None, :].repeat(1, 1, N, 1)
-            # print(A.shape, B.shape, '<< mask A and B shape', flush=True)
-            dist = torch.sum((A - B).pow(2), dim=-1)
-
-            dist_min, dist_pos = torch.topk(dist, k=near_kth, dim=1, largest=False, sorted=False)
-            # print(dist_min.shape, dist_pos.shape, ' << dist min shape', flush=True)
-            src_mask.scatter_(1, dist_pos, 0)
-        else:
-            raise NotImplementedError(self.mask_type)
+        # if self.mask_type == 'detr_mask':
+        #     mask = torch.zeros(B, N).bool().to(xyz.device)
+        #     src_mask = None
+        # elif self.mask_type == 'no_mask':
+        #     mask = None
+        #     src_mask = None
+        # elif self.mask_type.split('_')[0] == 'near':
+        #     near_kth = int(self.mask_type.split('_')[1])
+        #     # print('mask_type: get nearest kth', near_kth, flush=True)
+        #     mask = None
+        #     # mask = torch.zeros(B, N).bool().to(xyz.device)
+        #     src_mask = torch.zeros(B, N, N).to(xyz.device) - 1e9
+        #     A = xyz[:, None, :, :].repeat(1, N, 1, 1)
+        #     B = xyz[:, :, None, :].repeat(1, 1, N, 1)
+        #     # print(A.shape, B.shape, '<< mask A and B shape', flush=True)
+        #     dist = torch.sum((A - B).pow(2), dim=-1)
+        #
+        #     dist_min, dist_pos = torch.topk(dist, k=near_kth, dim=1, largest=False, sorted=False)
+        #     # print(dist_min.shape, dist_pos.shape, ' << dist min shape', flush=True)
+        #     src_mask.scatter_(1, dist_pos, 0)
+        # else:
+        #     raise NotImplementedError(self.mask_type)
         # print(mask, ' <<< mask')
-        seed_embd = None
-        if self.pos_embd_type == 'self':
-            pos_embd = self.input_proj(features)
-        elif self.pos_embd_type == 'none':
-            pos_embd = None
-        else:
-            pos_embd = self.pos_embd(xyz)
-            if seed_xyz is not None:
-                seed_embd = self.pos_embd(seed_xyz)
+        mask = None
+        src_mask = None
+        # seed_embd = None
+        # if self.pos_embd_type == 'self':
+        #     pos_embd = self.input_proj(features)
+        # elif self.pos_embd_type == 'none':
+        #     pos_embd = None
+        # else:
+        #     pos_embd = self.pos_embd(xyz)
+        #     if seed_xyz is not None:
+        #         seed_embd = self.pos_embd(seed_xyz)
         # print(xyz, features, '<< before transformer; features not right')
+        pos_embd = None
         features = self.input_proj(features)
         # print(features.shape, features.mean(), features.std(), '<< features std and mean')
         query_embd_weight = self.query_embed.weight if self.query_embed is not None else None
@@ -124,28 +128,70 @@ class DETR3D(nn.Module):  # just as a backbone; encoding afterward
         assert seed_features is None
         if self.weighted_input:  #TODO doit
             value = self.transformer(features, mask, query_embd_weight, pos_embd, src_mask=src_mask, src_position=xyz)
-        else:
-            value = self.transformer(features, mask, query_embd_weight, pos_embd, src_mask=src_mask)
+        # else:
+        #     value = self.transformer(features, mask, query_embd_weight, pos_embd, src_mask=src_mask)
 
         # return: dec_layer * B * Query * C
         if 'dec' in self.transformer_type or self.transformer_type.split(';')[-1] == 'deformable':
             hs = value[0]  # features_output
-        elif self.transformer_type in ['enc']:  # TODO THIS IS NOT RIGHT! LAYER TO BE DONE
-            hs = value
-        else:
-            raise NotImplementedError(self.transformer_type)
+        # elif self.transformer_type in ['enc']:  # TODO THIS IS NOT RIGHT! LAYER TO BE DONE
+        #     hs = value
+        # else:
+        #     raise NotImplementedError(self.transformer_type)
         # print(hs.shape, '<< output hs shape', flush=True)
         detr_feat = hs.permute(1, 2, 0, 3).reshape(B, N, -1)
         detr_feat = nn.functional.relu(self.hidden_norm(self.hidden_ffn(detr_feat)))
-        outputs_class = self.class_embed(detr_feat)
-        outputs_coord = self.bbox_embed(detr_feat)
+
+        if not USE_GT:
+            outputs_class = self.class_embed(detr_feat)
+            outputs_coord = self.bbox_embed(detr_feat)
+        else:
+            outputs_class = self.class_embed(detr_feat)
+            outputs_coord = self.bbox_embed(detr_feat)
+            # outputs_coord = torch.zeros(size=(B, N, 77), device="cuda", dtype=torch.float32)
+            outputs_coord[:,:,0:3] = output['center_label'][:, :, 0:3]
+
+            dist1, ind1, dist2, _ = nn_distance(output['aggregated_vote_xyz'], output['center_label'][:, :, 0:3])
+            object_assignment = ind1
+
+            outputs_coord[:, :, 3:4] = torch.gather(output['heading_class_label'], 1, object_assignment).unsqueeze(dim=-1)
+
+            heading_residual_label = torch.gather(output['heading_residual_label'], 1, object_assignment)  # select (B,K) from (B,K2)
+            outputs_coord[:, :, 4:5] = (heading_residual_label / (np.pi / 1)).unsqueeze(dim=-1)
+
+            # outputs_coord[:, :, 5:23] = size_class_label = torch.gather(output['size_class_label'], 1, object_assignment)
+
+            size_residual_label = torch.gather(output['size_residual_label'], 1,
+                                               object_assignment.unsqueeze(-1).repeat(1, 1, 3))
+
+            num_heading_bin = config.num_heading_bin
+            num_size_cluster = config.num_size_cluster
+            num_class = config.num_class
+            mean_size_arr = config.mean_size_arr
+
+            size_class_label = torch.gather(output['size_class_label'], 1, object_assignment)
+
+            batch_size = object_assignment.shape[0]
+
+            size_label_one_hot = torch.cuda.FloatTensor(batch_size, size_class_label.shape[1], num_size_cluster).zero_()
+            size_label_one_hot.scatter_(2, size_class_label.unsqueeze(-1),
+                                        1)  # src==1 so it's *one-hot* (B,K,num_size_cluster)
+            size_label_one_hot_tiled = size_label_one_hot.unsqueeze(-1).repeat(1, 1, 1, 3)
+
+            mean_size_arr_expanded = torch.from_numpy(mean_size_arr.astype(np.float32)).cuda().unsqueeze(0).unsqueeze(
+                0)  # (1,1,num_size_cluster,3)
+            mean_size_label = torch.sum(size_label_one_hot_tiled * mean_size_arr_expanded, 2)  # (B,K,3)
+            size_residual_label_normalized = size_residual_label / mean_size_label
+
+            # outputs_coord[:, :, 23:77] = size_residual_label_normalized
+            outputs_coord[:, :, 23:77] = torch.zeros(size=(B, N, 54), device="cuda", dtype=torch.float32) #TODO
         # outputs_coord = outputs_coord.sigmoid() #No Sigmoid!!!
         # print(outputs_class.shape, outputs_coord.shape, 'output coord and class')
         if 'dec' in self.transformer_type or self.transformer_type.split(';')[-1] == 'deformable':
             output = {'pred_logits': outputs_class, 'pred_boxes': outputs_coord}  # final
             output['detr_features'] = detr_feat
-            if self.aux_loss:
-                output['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
+            # if self.aux_loss:
+            #     output['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
 
             if self.weighted_input or self.seed_attention: # sum with attention weight (just for output!)
                 weighted_xyz = value[-1]  # just weighted
@@ -158,33 +204,33 @@ class DETR3D(nn.Module):  # just as a backbone; encoding afterward
         return output
 
     # @torch.jit.unused
-    def _set_aux_loss(self, outputs_class, outputs_coord):
-        # this is a workaround to make torchscript happy, as torchscript
-        # doesn't support dictionary with non-homogeneous values, such
-        # as a dict having both a Tensor and a list.
-        return [{'pred_logits': a, 'pred_boxes': b}
-                for a, b in zip(outputs_class[:-1], outputs_coord[:-1])]
+    # def _set_aux_loss(self, outputs_class, outputs_coord):
+    #     # this is a workaround to make torchscript happy, as torchscript
+    #     # doesn't support dictionary with non-homogeneous values, such
+    #     # as a dict having both a Tensor and a list.
+    #     return [{'pred_logits': a, 'pred_boxes': b}
+    #             for a, b in zip(outputs_class[:-1], outputs_coord[:-1])]
 
 
-if __name__ == "__main__":
-    from easydict import EasyDict
-    # def __init__(self, config_transformer, input_channels, num_classes, num_queries, aux_loss=False):
-    config_transformer = {
-        'enc_layers': 6,
-        'dec_layers': 6,
-        'dim_feedforward': 2048,
-        'hidden_dim': 288,
-        'dropout': 0.1,
-        'nheads': 8,
-        'num_queries': 100,
-        'pre_norm': False,
-        'position_embedding': 'sine'
-    }
-    config_transformer = EasyDict(config_transformer)
-    model = DETR3D(config_transformer, 128, 10, 20)
-    xyz = torch.randn(4, 100, 3)
-    features = torch.randn(4, 100, 128)
-    # xyz = torch.randn(4, 3, 100)
-    # features = torch.randn(4, 128, 100)
-    out = model(xyz, features, {})
-    # print(out)
+# if __name__ == "__main__":
+#     from easydict import EasyDict
+#     # def __init__(self, config_transformer, input_channels, num_classes, num_queries, aux_loss=False):
+#     config_transformer = {
+#         'enc_layers': 6,
+#         'dec_layers': 6,
+#         'dim_feedforward': 2048,
+#         'hidden_dim': 288,
+#         'dropout': 0.1,
+#         'nheads': 8,
+#         'num_queries': 100,
+#         'pre_norm': False,
+#         'position_embedding': 'sine'
+#     }
+#     config_transformer = EasyDict(config_transformer)
+#     model = DETR3D(config_transformer, 128, 10, 20)
+#     xyz = torch.randn(4, 100, 3)
+#     features = torch.randn(4, 100, 128)
+#     # xyz = torch.randn(4, 3, 100)
+#     # features = torch.randn(4, 128, 100)
+#     out = model(xyz, features, {})
+#     # print(out)

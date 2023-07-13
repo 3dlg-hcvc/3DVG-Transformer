@@ -38,12 +38,12 @@ def decode_scores_boxes(output_dict, end_points, num_heading_bin, num_size_clust
             # print(center.shape, transformer_xyz.shape)
             transformer_xyz = nn.functional.pad(transformer_xyz, (0, 3+num_heading_bin*2+num_size_cluster*4-transformer_xyz.shape[-1]))
             pred_boxes = pred_boxes + transformer_xyz  # residual
-        else:
-            raise NotImplementedError('You should add it to the transformer final xyz')
-            base_xyz = nn.functional.pad(base_xyz, (0, num_heading_bin*2+num_size_cluster*4))
-            pred_boxes = pred_boxes + base_xyz  # residual
-    else:
-        raise NotImplementedError('center without bias(for decoder): not Implemented')
+        # else:
+        #     raise NotImplementedError('You should add it to the transformer final xyz')
+        #     base_xyz = nn.functional.pad(base_xyz, (0, num_heading_bin*2+num_size_cluster*4))
+        #     pred_boxes = pred_boxes + base_xyz  # residual
+    # else:
+    #     raise NotImplementedError('center without bias(for decoder): not Implemented')
 
     center = pred_boxes[:,:,0:3] # (batch_size, num_proposal, 3) TODO RESIDUAL
     end_points['center'] = center
@@ -475,30 +475,47 @@ def build_transformer(args):
     transformer_type = args.get('transformer_type', 'enc_dec')
     print('[build transformer] Using transformer type', transformer_type)
     print(args, '<< transformer config')
-    if transformer_type == 'enc_dec':
-        return Transformer3D(
-            d_model=args.hidden_dim,
-            dropout=args.dropout,
-            nhead=args.nheads,
-            dim_feedforward=args.dim_feedforward,
-            num_encoder_layers=args.enc_layers,
-            num_decoder_layers=args.dec_layers,
-            normalize_before=args.pre_norm,
-            return_intermediate_dec=True,
-        )
-    elif transformer_type == 'enc':
-        return Transformer3D(
-            d_model=args.hidden_dim,
-            dropout=args.dropout,
-            nhead=args.nheads,
-            dim_feedforward=args.dim_feedforward,
-            num_encoder_layers=args.enc_layers,
-            normalize_before=args.pre_norm,
-            return_intermediate_dec=False,
-            have_decoder=False,
-        )
-    elif transformer_type.split(';')[-1] == 'deformable':
-        return Transformer3D(
+    # if transformer_type == 'enc_dec':
+    #     return Transformer3D(
+    #         d_model=args.hidden_dim,
+    #         dropout=args.dropout,
+    #         nhead=args.nheads,
+    #         dim_feedforward=args.dim_feedforward,
+    #         num_encoder_layers=args.enc_layers,
+    #         num_decoder_layers=args.dec_layers,
+    #         normalize_before=args.pre_norm,
+    #         return_intermediate_dec=True,
+    #     )
+    # elif transformer_type == 'enc':
+    #     return Transformer3D(
+    #         d_model=args.hidden_dim,
+    #         dropout=args.dropout,
+    #         nhead=args.nheads,
+    #         dim_feedforward=args.dim_feedforward,
+    #         num_encoder_layers=args.enc_layers,
+    #         normalize_before=args.pre_norm,
+    #         return_intermediate_dec=False,
+    #         have_decoder=False,
+    #     )
+    # elif transformer_type.split(';')[-1] == 'deformable':
+    #     return Transformer3D(
+    #         d_model=args.hidden_dim,
+    #         dropout=args.dropout,
+    #         nhead=args.nheads,
+    #         dim_feedforward=args.dim_feedforward,
+    #         num_encoder_layers=args.enc_layers,
+    #         num_decoder_layers=args.dec_layers,
+    #         normalize_before=args.pre_norm,
+    #         return_intermediate_dec=True,
+    #         have_encoder=False,
+    #         have_decoder=True,  # using input position
+    #         attention_type=transformer_type,
+    #         deformable_type=args.get('deformable_type','nearby'),
+    #         offset_size=args.get('offset_size', 3)
+    #     )
+    # else:
+    #     raise NotImplementedError(transformer_type)
+    return Transformer3D(
             d_model=args.hidden_dim,
             dropout=args.dropout,
             nhead=args.nheads,
@@ -511,10 +528,7 @@ def build_transformer(args):
             have_decoder=True,  # using input position
             attention_type=transformer_type,
             deformable_type=args.get('deformable_type','nearby'),
-            offset_size=args.get('offset_size', 3)
-        )
-    else:
-        raise NotImplementedError(transformer_type)
+            offset_size=args.get('offset_size', 3))
 
 def gelu(x):
     return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))

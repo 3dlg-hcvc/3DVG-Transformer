@@ -16,10 +16,21 @@ from models.detr.transformer3D import decode_scores_boxes
 from utils.box_util import get_3d_box_batch
 from macro import *
 
-def decode_scores_classes(output_dict, end_points, num_class):
-    pred_logits = output_dict['pred_logits']
-    assert pred_logits.shape[-1] == 2+num_class, 'pred_logits.shape wrong'
-    objectness_scores = pred_logits[:,:,0:2]  # TODO CHANGE IT; JUST SOFTMAXd
+def decode_scores_classes(output_dict, end_points, num_class, data_dict):
+
+
+    if USE_GT:
+        final_fps_ind = torch.gather(data_dict["seed_inds"], dim=1, index=data_dict['aggregated_vote_inds'].long())
+        obj_scores = torch.gather(data_dict["vote_label_mask"], dim=1, index=final_fps_ind.long())
+        new_obj_scores = torch.unsqueeze(obj_scores, dim=-1)
+        objectness_scores = torch.cat([1 - new_obj_scores, new_obj_scores], dim=-1)
+
+        pred_logits = output_dict['pred_logits']
+    else:
+        pred_logits = output_dict['pred_logits']
+        assert pred_logits.shape[-1] == 2 + num_class, 'pred_logits.shape wrong'
+        objectness_scores = pred_logits[:, :, 0:2]  # TODO CHANGE IT; JUST SOFTMAXd
+
     end_points['objectness_scores'] = objectness_scores
     sem_cls_scores = pred_logits[:,:,2:2+num_class] # Bxnum_proposalx10
     end_points['sem_cls_scores'] = sem_cls_scores
@@ -58,7 +69,7 @@ def decode_dataset_config(data_dict, dataset_config):
 
 # TODO: You Should Check It!
 def decode_scores(output_dict, end_points,  num_class, num_heading_bin, num_size_cluster, mean_size_arr, center_with_bias=False, quality_channel=False, dataset_config=None):
-    end_points = decode_scores_classes(output_dict, end_points, num_class)
+    end_points = decode_scores_classes(output_dict, end_points, num_class, end_points)
     end_points = decode_scores_boxes(output_dict, end_points, num_heading_bin, num_size_cluster, mean_size_arr, center_with_bias, quality_channel)
     end_points = decode_dataset_config(end_points, dataset_config)
     return end_points
@@ -115,25 +126,21 @@ class ProposalModule(nn.Module):
         # Object proposal/detection
         # Objectness scores (2), center residual (3),
         # heading class+residual (num_heading_bin*2), size class+residual(num_size_cluster*4)
-        if not USE_GT:
-            self.conv1 = torch.nn.Conv1d(128, 128, 1)
-            self.conv2 = torch.nn.Conv1d(128, 128, 1)
-            self.bn1 = torch.nn.BatchNorm1d(128)
-            self.bn2 = torch.nn.BatchNorm1d(128)
-            # JUST FOR
+        self.conv1 = torch.nn.Conv1d(128, 128, 1)
+        self.conv2 = torch.nn.Conv1d(128, 128, 1)
+        self.bn1 = torch.nn.BatchNorm1d(128)
+        self.bn2 = torch.nn.BatchNorm1d(128)
+        # JUST FOR
 
-            if self.position_type == 'seed_attention':
-                self.seed_feature_trans = torch.nn.Sequential(
-                    torch.nn.Conv1d(256, 128, 1),
-                    torch.nn.BatchNorm1d(128),
-                    torch.nn.PReLU(128)
-                )
+        if self.position_type == 'seed_attention':
+            self.seed_feature_trans = torch.nn.Sequential(
+                torch.nn.Conv1d(256, 128, 1),
+                torch.nn.BatchNorm1d(128),
+                torch.nn.PReLU(128)
+            )
 
-            self.detr = DETR3D(config_transformer, input_channels=128, class_output_shape=2+num_class, bbox_output_shape=3+num_heading_bin*2+num_size_cluster*4+int(quality_channel))
-        else:
+        self.detr = DETR3D(config_transformer, input_channels=128, class_output_shape=2+num_class, bbox_output_shape=3+num_heading_bin*2+num_size_cluster*4+int(quality_channel))
 
-            self.detr = DETR3D(config_transformer, input_channels=16, class_output_shape=2 + num_class,
-                               bbox_output_shape=3 + num_heading_bin * 2 + num_size_cluster * 4 + int(quality_channel))
 
     def forward(self, xyz, features, end_points):  # initial_xyz and xyz(voted): just for encoding
         """
@@ -145,24 +152,20 @@ class ProposalModule(nn.Module):
         """
 
 
-        if self.sampling == 'vote_fps' and not USE_GT:
+        if self.sampling == 'vote_fps':
             seed_xyz, seed_features = end_points['seed_xyz'], features
             # Farthest point sampling (FPS) on votes
             xyz, features, fps_inds = self.vote_aggregation(xyz, features)
             sample_inds = fps_inds
             end_points['aggregated_vote_xyz'] = xyz  # (batch_size, num_proposal, 3)
             end_points['aggregated_vote_features'] = features.permute(0, 2, 1).contiguous() # (batch_size, num_proposal, 128)
-            # end_points['aggregated_vote_inds'] = sample_inds  # (batch_size, num_proposal,) # should be 0,1,2,...,num_proposal
+            end_points['aggregated_vote_inds'] = sample_inds  # (batch_size, num_proposal,) # should be 0,1,2,...,num_proposal
 
             # --------- PROPOSAL GENERATION ----------  TODO PROPOSAL GENERATION AND CHANGE LOSS GENERATION
             # print(features.mean(), features.std(), ' << first,votenet forward features mean and std', flush=True) # TODO CHECK IT
             features = F.relu(self.bn1(self.conv1(features)))
             features = F.relu(self.bn2(self.conv2(features)))
             features = features.permute(0, 2, 1)
-
-        if USE_GT:
-            end_points['aggregated_vote_xyz'] = xyz
-            end_points['aggregated_vote_features'] = features
 
 
 
@@ -173,21 +176,21 @@ class ProposalModule(nn.Module):
 
         # print(xyz.shape, features.shape, '<< detr input feature dim')
         if self.position_type == 'vote':
-            output_dict = self.detr(xyz, features, end_points)
+            output_dict = self.detr(xyz, features, end_points, config=self.dataset_config)
             end_points['detr_features'] = output_dict['detr_features']
-        elif self.position_type == 'seed_attention':
-            decode_vars = {
-                'num_class': self.num_class, 
-                'num_heading_bin': self.num_heading_bin,
-                'num_size_cluster': self.num_size_cluster, 
-                'mean_size_arr': self.mean_size_arr,
-                'aggregated_vote_xyz': xyz
-            }
-            seed_features = self.seed_feature_trans(seed_features)
-            seed_features = seed_features.permute(0, 2, 1).contiguous()
-            output_dict = self.detr(xyz, features, end_points, seed_xyz=seed_xyz, seed_features=seed_features, decode_vars=decode_vars)
-        else:
-            raise NotImplementedError(self.position_type)
+        # elif self.position_type == 'seed_attention':
+        #     decode_vars = {
+        #         'num_class': self.num_class,
+        #         'num_heading_bin': self.num_heading_bin,
+        #         'num_size_cluster': self.num_size_cluster,
+        #         'mean_size_arr': self.mean_size_arr,
+        #         'aggregated_vote_xyz': xyz
+        #     }
+        #     seed_features = self.seed_feature_trans(seed_features)
+        #     seed_features = seed_features.permute(0, 2, 1).contiguous()
+        #     output_dict = self.detr(xyz, features, end_points, seed_xyz=seed_xyz, seed_features=seed_features, decode_vars=decode_vars)
+        # else:
+        #     raise NotImplementedError(self.position_type)
         # output_dict = self.detr(xyz, features, end_points)
         end_points = decode_scores(output_dict, end_points, self.num_class, self.num_heading_bin, self.num_size_cluster, self.mean_size_arr,
                                    self.center_with_bias, quality_channel=self.quality_channel, dataset_config=self.dataset_config)

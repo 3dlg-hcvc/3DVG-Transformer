@@ -95,7 +95,7 @@ def compute_objectness_loss(data_dict):
     gt_center = data_dict['center_label'][:, :, 0:3]
     B = gt_center.shape[0]
     K = aggregated_vote_xyz.shape[1]
-    K2 = gt_center.shape[1]
+    # K2 = gt_center.shape[1]
     dist1, ind1, dist2, _ = nn_distance(aggregated_vote_xyz, gt_center)  # dist1: BxK, dist2: BxK2
 
     # Generate objectness label and mask
@@ -415,7 +415,7 @@ def get_loss(data_dict, config, detection=True, reference=True, use_lang_classif
 
         # Obj loss
         objectness_loss, objectness_label, objectness_mask, object_assignment = compute_objectness_loss(data_dict)
-        num_proposal = objectness_label.shape[1]
+        # num_proposal = objectness_label.shape[1]
         total_num_proposal = objectness_label.shape[0] * objectness_label.shape[1]
         data_dict['objectness_label'] = objectness_label
         data_dict['objectness_mask'] = objectness_mask
@@ -428,46 +428,35 @@ def get_loss(data_dict, config, detection=True, reference=True, use_lang_classif
             data_dict, config)
         box_loss = center_loss + 0.1 * heading_cls_loss + heading_reg_loss + 0.1 * size_cls_loss + size_reg_loss
 
-    if detection:
-        if not USE_GT:
-            data_dict['vote_loss'] = vote_loss
-            data_dict['objectness_loss'] = objectness_loss
-            data_dict['center_loss'] = center_loss
-            data_dict['heading_cls_loss'] = heading_cls_loss
-            data_dict['heading_reg_loss'] = heading_reg_loss
-            data_dict['size_cls_loss'] = size_cls_loss
-            data_dict['size_reg_loss'] = size_reg_loss
-            data_dict['sem_cls_loss'] = sem_cls_loss
-            data_dict['box_loss'] = box_loss
-    else:
-        if not USE_GT:
-            data_dict['vote_loss'] = torch.zeros(1)[0].cuda()
-            data_dict['objectness_loss'] = torch.zeros(1)[0].cuda()
-            data_dict['center_loss'] = torch.zeros(1)[0].cuda()
-            data_dict['heading_cls_loss'] = torch.zeros(1)[0].cuda()
-            data_dict['heading_reg_loss'] = torch.zeros(1)[0].cuda()
-            data_dict['size_cls_loss'] = torch.zeros(1)[0].cuda()
-            data_dict['size_reg_loss'] = torch.zeros(1)[0].cuda()
-            data_dict['sem_cls_loss'] = torch.zeros(1)[0].cuda()
-            data_dict['box_loss'] = torch.zeros(1)[0].cuda()
+    if detection and not USE_GT:
+        data_dict['vote_loss'] = vote_loss
+        data_dict['objectness_loss'] = objectness_loss
+        data_dict['center_loss'] = center_loss
+        data_dict['heading_cls_loss'] = heading_cls_loss
+        data_dict['heading_reg_loss'] = heading_reg_loss
+        data_dict['size_cls_loss'] = size_cls_loss
+        data_dict['size_reg_loss'] = size_reg_loss
+        data_dict['sem_cls_loss'] = sem_cls_loss
+        data_dict['box_loss'] = box_loss
+
 
     if reference:
         # Reference loss
         data_dict, ref_loss, _, cluster_labels = compute_reference_loss(data_dict, config)
         data_dict["cluster_labels"] = cluster_labels
         data_dict["ref_loss"] = ref_loss
-    else:
-        # # Reference loss
-        ref_loss, ref_loss, _, cluster_labels = compute_reference_loss(data_dict, config, no_reference=True)
-        # data_dict["cluster_labels"] = cluster_labels
-        lang_count = data_dict['ref_center_label_list'].shape[1]
-        # data_dict["cluster_labels"] = objectness_label.new_zeros(objectness_label.shape).cuda().repeat(lang_count, 1)
-        data_dict["cluster_labels"] = cluster_labels
-        data_dict["cluster_ref"] = objectness_label.new_zeros(objectness_label.shape, device="cuda", dtype=torch.float32).repeat(lang_count, 1)
-        # store
-        data_dict["ref_loss"] = torch.zeros(1)[0].cuda()
-        # data_dict['max_iou_rate_0.25'] = 0
-        # data_dict['max_iou_rate_0.5'] = 0
+    # else:
+    #     # # Reference loss
+    #     ref_loss, ref_loss, _, cluster_labels = compute_reference_loss(data_dict, config, no_reference=True)
+    #     # data_dict["cluster_labels"] = cluster_labels
+    #     lang_count = data_dict['ref_center_label_list'].shape[1]
+    #     # data_dict["cluster_labels"] = objectness_label.new_zeros(objectness_label.shape).cuda().repeat(lang_count, 1)
+    #     data_dict["cluster_labels"] = cluster_labels
+    #     data_dict["cluster_ref"] = objectness_label.new_zeros(objectness_label.shape, device="cuda", dtype=torch.float32).repeat(lang_count, 1)
+    #     # store
+    #     data_dict["ref_loss"] = torch.zeros(1)[0].cuda()
+    #     # data_dict['max_iou_rate_0.25'] = 0
+    #     # data_dict['max_iou_rate_0.5'] = 0
 
     if reference and use_lang_classifier:
         data_dict["lang_loss"] = compute_lang_classification_loss(data_dict)
@@ -475,11 +464,12 @@ def get_loss(data_dict, config, detection=True, reference=True, use_lang_classif
         data_dict["lang_loss"] = torch.zeros(1)[0].cuda()
 
     # Final loss function
-    if not USE_GT:
-        loss = data_dict['vote_loss'] + 0.1 * data_dict['objectness_loss'] + data_dict['box_loss'] + 0.1 * data_dict[
-            'sem_cls_loss'] + 0.03 * data_dict["ref_loss"] + 0.03 * data_dict["lang_loss"]
-    else:
-        loss = 0.03 * data_dict["ref_loss"] + 0.03 * data_dict["lang_loss"]
+    if detection:
+        loss = 0
+        if not USE_GT:
+            loss = data_dict['vote_loss'] + 0.1 * data_dict['objectness_loss'] + data_dict['box_loss'] + 0.1 * data_dict[
+                'sem_cls_loss']
+    loss += 0.03 * data_dict["ref_loss"] + 0.03 * data_dict["lang_loss"]
 
     loss *= 10  # amplify
     data_dict['loss'] = loss
