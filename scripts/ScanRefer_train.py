@@ -50,7 +50,7 @@ def get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, split, config
     )
     # dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle, num_workers=4, pin_memory=True)
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle, num_workers=0, pin_memory=True)
 
     return dataset, dataloader
 
@@ -302,7 +302,7 @@ def train(args):
 
     # dataloader
     train_dataset, train_dataloader = get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, "train", DC, augment=True)
-    val_dataset, val_dataloader = get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, "val", DC, augment=False)
+    val_dataset, val_dataloader = get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, "val", DC, augment=False, shuffle=False)
     dataloader = {
         "train": train_dataloader,
         "val": val_dataloader

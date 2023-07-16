@@ -9,7 +9,7 @@ import torch
 from torch.optim.lr_scheduler import StepLR, MultiStepLR, CosineAnnealingLR
 from lib.config import CONF
 from lib.loss_helper import get_loss
-from lib.eval_helper import get_eval, get_eval_multi3drefer
+from lib.eval_helper import get_eval_multi3drefer
 from lib.pointnet2.pytorch_utils import BNMomentumScheduler
 from macro import *
 from lib.multi3drefer_evaluator import Multi3DReferEvaluator

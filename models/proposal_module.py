@@ -17,17 +17,13 @@ from utils.box_util import get_3d_box_batch
 from macro import *
 
 def decode_scores_classes(output_dict, end_points, num_class, data_dict):
-
-
+    pred_logits = output_dict['pred_logits']
     if USE_GT:
         final_fps_ind = torch.gather(data_dict["seed_inds"], dim=1, index=data_dict['aggregated_vote_inds'].long())
         obj_scores = torch.gather(data_dict["vote_label_mask"], dim=1, index=final_fps_ind.long())
         new_obj_scores = torch.unsqueeze(obj_scores, dim=-1)
         objectness_scores = torch.cat([1 - new_obj_scores, new_obj_scores], dim=-1)
-
-        pred_logits = output_dict['pred_logits']
     else:
-        pred_logits = output_dict['pred_logits']
         assert pred_logits.shape[-1] == 2 + num_class, 'pred_logits.shape wrong'
         objectness_scores = pred_logits[:, :, 0:2]  # TODO CHANGE IT; JUST SOFTMAXd
 
@@ -37,42 +33,44 @@ def decode_scores_classes(output_dict, end_points, num_class, data_dict):
     return end_points
 
 
-def decode_dataset_config(data_dict, dataset_config):
-    if dataset_config is not None:
-        # print('decode_dataset_config', flush=True)
-        pred_center = data_dict['center'].detach().cpu().numpy()  # (B,K,3)
-        pred_heading_class = torch.argmax(data_dict['heading_scores'], -1)  # B,num_proposal
-        pred_heading_residual = torch.gather(data_dict['heading_residuals'], 2,
-                                             pred_heading_class.unsqueeze(-1))  # B,num_proposal,1
-        pred_heading_class = pred_heading_class.detach().cpu().numpy()  # B,num_proposal
-        pred_heading_residual = pred_heading_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal
-        pred_size_class = torch.argmax(data_dict['size_scores'], -1)  # B,num_proposal
-        pred_size_residual = torch.gather(data_dict['size_residuals'], 2,
-                                          pred_size_class.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 1,
-                                                                                         3))  # B,num_proposal,1,3
-        pred_size_class = pred_size_class.detach().cpu().numpy()
-        pred_size_residual = pred_size_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal,3
-        batch_size = pred_center.shape[0]
-        pred_obbs, pred_bboxes = [], []
-        for i in range(batch_size):
-            pred_obb_batch = dataset_config.param2obb_batch(pred_center[i, :, 0:3], pred_heading_class[i],
-                                                            pred_heading_residual[i],
-                                                            pred_size_class[i], pred_size_residual[i])
-            pred_bbox_batch = get_3d_box_batch(pred_obb_batch[:, 3:6], pred_obb_batch[:, 6], pred_obb_batch[:, 0:3])
-            pred_obbs.append(torch.from_numpy(pred_obb_batch))
-            pred_bboxes.append(torch.from_numpy(pred_bbox_batch))
-            # print(pred_obb_batch.shape, pred_bbox_batch.shape)
-        data_dict['pred_obbs'] = torch.stack(pred_obbs, dim=0).cuda()
-        data_dict['pred_bboxes'] = torch.stack(pred_bboxes, dim=0).cuda()
-    return data_dict
+# def decode_dataset_config(data_dict, dataset_config):
+#     if dataset_config is not None:
+#         # print('decode_dataset_config', flush=True)
+#         pred_center = data_dict['center'].detach().cpu().numpy()  # (B,K,3)
+#         pred_heading_class = torch.argmax(data_dict['heading_scores'], -1)  # B,num_proposal
+#         pred_heading_residual = torch.gather(data_dict['heading_residuals'], 2,
+#                                              pred_heading_class.unsqueeze(-1))  # B,num_proposal,1
+#         pred_heading_class = pred_heading_class.detach().cpu().numpy()  # B,num_proposal
+#         pred_heading_residual = pred_heading_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal
+#         pred_size_class = torch.argmax(data_dict['size_scores'], -1)  # B,num_proposal
+#         pred_size_residual = torch.gather(data_dict['size_residuals'], 2,
+#                                           pred_size_class.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 1,
+#                                                                                          3))  # B,num_proposal,1,3
+#         pred_size_class = pred_size_class.detach().cpu().numpy()
+#         pred_size_residual = pred_size_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal,3
+#         batch_size = pred_center.shape[0]
+#         # pred_obbs, pred_bboxes = [], []
+#         pred_bboxes = []
+#         for i in range(batch_size):
+#             # pred_obb_batch = dataset_config.param2obb_batch(pred_center[i, :, 0:3], pred_heading_class[i],
+#             #                                                 pred_heading_residual[i],
+#             #                                                 pred_size_class[i], pred_size_residual[i])
+#             pred_bbox_batch = get_3d_box_batch(pred_obb_batch[:, 3:6], pred_obb_batch[:, 6], pred_obb_batch[:, 0:3])
+#             # pred_obbs.append(torch.from_numpy(pred_obb_batch))
+#             pred_bboxes.append(torch.from_numpy(pred_bbox_batch))
+#             # print(pred_obb_batch.shape, pred_bbox_batch.shape)
+#         # data_dict['pred_obbs'] = torch.stack(pred_obbs, dim=0).cuda()
+#         data_dict['pred_bboxes'] = torch.stack(pred_bboxes, dim=0).cuda()
+#     return data_dict
 
 
 # TODO: You Should Check It!
 def decode_scores(output_dict, end_points,  num_class, num_heading_bin, num_size_cluster, mean_size_arr, center_with_bias=False, quality_channel=False, dataset_config=None):
     end_points = decode_scores_classes(output_dict, end_points, num_class, end_points)
     end_points = decode_scores_boxes(output_dict, end_points, num_heading_bin, num_size_cluster, mean_size_arr, center_with_bias, quality_channel)
-    end_points = decode_dataset_config(end_points, dataset_config)
+    # end_points = decode_dataset_config(end_points, dataset_config)
     return end_points
+
 
 class ProposalModule(nn.Module):
     def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal, sampling,

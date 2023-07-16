@@ -195,7 +195,7 @@ class DETR3D(nn.Module):  # just as a backbone; encoding afterward
 
             if self.weighted_input or self.seed_attention: # sum with attention weight (just for output!)
                 weighted_xyz = value[-1]  # just weighted
-                output['transformer_weighted_xyz_all'] = weighted_xyz
+                # output['transformer_weighted_xyz_all'] = weighted_xyz
                 output['transformer_weighted_xyz'] = weighted_xyz[-1]  # just sum it
             else:
                 raise NotImplementedError('must transformer weighted attn')

@@ -11,9 +11,9 @@ sys.path.append(os.path.join(os.getcwd())) # HACK add the root folder
 from lib.pointgroup_ops.functions import pointgroup_ops
 from lib.config import CONF
 from lib.dataset import ScannetReferenceDataset
-from lib.ap_helper import APCalculator, parse_predictions, parse_groundtruths
+# from lib.ap_helper import APCalculator, parse_predictions, parse_groundtruths
 from lib.loss_helper import get_loss
-from lib.eval_helper import get_eval
+# from lib.eval_helper import get_eval
 from models.refnet import RefNet
 from data.scannet.model_util_scannet import ScannetDatasetConfig
 

@@ -308,14 +308,14 @@ def compute_reference_loss(data_dict, config, no_reference=False):
 
         labels_new = np.zeros((len_nun_max, num_proposals))
         # convert the bbox parameters to bbox corners
-        if USE_GT:
-            pred_obb_batch = config.param2obb_batch(data_dict["center_label"][i].cpu().numpy(), data_dict["heading_class_label"][i].cpu().numpy(),
-                                                    data_dict["heading_residual_label"][i].cpu().numpy(),
-                                                    data_dict["size_class_label"][i].cpu().numpy(), data_dict["size_residual_label"][i].cpu().numpy())
-        else:
-            pred_obb_batch = config.param2obb_batch(pred_center[i, :, 0:3], pred_heading_class[i],
-                                                    pred_heading_residual[i],
-                                                    pred_size_class[i], pred_size_residual[i])
+        # if USE_GT:
+        #     pred_obb_batch = config.param2obb_batch(data_dict["center_label"][i].cpu().numpy(), data_dict["heading_class_label"][i].cpu().numpy(),
+        #                                             data_dict["heading_residual_label"][i].cpu().numpy(),
+        #                                             data_dict["size_class_label"][i].cpu().numpy(), data_dict["size_residual_label"][i].cpu().numpy())
+        # else:
+        pred_obb_batch = config.param2obb_batch(pred_center[i, :, 0:3], pred_heading_class[i],
+                                                pred_heading_residual[i],
+                                                pred_size_class[i], pred_size_residual[i])
         pred_bbox_batch = get_3d_box_batch(pred_obb_batch[:, 3:6], pred_obb_batch[:, 6], pred_obb_batch[:, 0:3])
         for j in range(len_nun_max):
             if j < lang_num[i]:
@@ -420,8 +420,8 @@ def get_loss(data_dict, config, detection=True, reference=True, use_lang_classif
         data_dict['objectness_label'] = objectness_label
         data_dict['objectness_mask'] = objectness_mask
         data_dict['object_assignment'] = object_assignment
-        data_dict['pos_ratio'] = torch.sum(objectness_label.float().cuda()) / float(total_num_proposal)
-        data_dict['neg_ratio'] = torch.sum(objectness_mask.float()) / float(total_num_proposal) - data_dict['pos_ratio']
+        # data_dict['pos_ratio'] = torch.sum(objectness_label.float().cuda()) / float(total_num_proposal)
+        # data_dict['neg_ratio'] = torch.sum(objectness_mask.float()) / float(total_num_proposal) - data_dict['pos_ratio']
 
         # Box loss and sem cls loss
         center_loss, heading_cls_loss, heading_reg_loss, size_cls_loss, size_reg_loss, sem_cls_loss = compute_box_and_sem_cls_loss(
@@ -431,11 +431,11 @@ def get_loss(data_dict, config, detection=True, reference=True, use_lang_classif
     if detection and not USE_GT:
         data_dict['vote_loss'] = vote_loss
         data_dict['objectness_loss'] = objectness_loss
-        data_dict['center_loss'] = center_loss
-        data_dict['heading_cls_loss'] = heading_cls_loss
-        data_dict['heading_reg_loss'] = heading_reg_loss
-        data_dict['size_cls_loss'] = size_cls_loss
-        data_dict['size_reg_loss'] = size_reg_loss
+        # data_dict['center_loss'] = center_loss
+        # data_dict['heading_cls_loss'] = heading_cls_loss
+        # data_dict['heading_reg_loss'] = heading_reg_loss
+        # data_dict['size_cls_loss'] = size_cls_loss
+        # data_dict['size_reg_loss'] = size_reg_loss
         data_dict['sem_cls_loss'] = sem_cls_loss
         data_dict['box_loss'] = box_loss
 
@@ -464,12 +464,13 @@ def get_loss(data_dict, config, detection=True, reference=True, use_lang_classif
         data_dict["lang_loss"] = torch.zeros(1)[0].cuda()
 
     # Final loss function
+    loss = 0
     if detection:
-        loss = 0
+
         if not USE_GT:
             loss = data_dict['vote_loss'] + 0.1 * data_dict['objectness_loss'] + data_dict['box_loss'] + 0.1 * data_dict[
                 'sem_cls_loss']
-    loss += 0.03 * data_dict["ref_loss"] + 0.03 * data_dict["lang_loss"]
+    loss += (0.03 * data_dict["ref_loss"] + 0.03 * data_dict["lang_loss"])
 
     loss *= 10  # amplify
     data_dict['loss'] = loss
