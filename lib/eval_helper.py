@@ -323,9 +323,15 @@ def get_eval_multi3drefer(data_dict, config):
     pred_heading_class = pred_heading_class.detach().cpu().numpy()  # B,num_proposal
     pred_heading_residual = pred_heading_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal
     pred_size_class = torch.argmax(data_dict['size_scores'], -1)  # B,num_proposal
-    pred_size_residual = torch.gather(data_dict['size_residuals'], 2,
-                                      pred_size_class.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 1,
-                                                                                         3))  # B,num_proposal,1,3
+
+    if not USE_GT:
+        pred_size_residual = torch.gather(data_dict['size_residuals'], 2,
+                                          pred_size_class.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 1,
+                                                                                             3))  # B,num_proposal,1,3
+    else:
+        pred_size_residual = data_dict["size_residual_label"].unsqueeze(-2)
+
+
     pred_size_class = pred_size_class.detach().cpu().numpy()
     pred_size_residual = pred_size_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal,3
     gts = {}
