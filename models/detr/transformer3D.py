@@ -63,6 +63,30 @@ def decode_scores_boxes(output_dict, end_points, num_heading_bin, num_size_clust
     end_points['size_residuals_normalized'] = size_residuals_normalized
     mean_size = torch.from_numpy(mean_size_arr.astype(np.float32)).type_as(pred_boxes).unsqueeze(0).unsqueeze(0)
     end_points['size_residuals'] = size_residuals_normalized * mean_size
+
+
+    # if USE_GT:
+    #     pred_center = end_points['center_label']  # (B,MAX_NUM_OBJ,3)
+    #     pred_heading_class = end_points['heading_class_label']  # B,K2
+    #     pred_heading_residual = end_points['heading_residual_label']  # B,K2
+    #     pred_size_class = end_points['size_class_label']  # B,K2
+    #     pred_size_residual = end_points['size_residual_label']  # B,K2,3
+    #
+    #     # assign
+    #     pred_center = torch.gather(pred_center, 1, end_points["object_assignment"].unsqueeze(2).repeat(1, 1, 3))
+    #     pred_heading_class = torch.gather(pred_heading_class, 1, end_points["object_assignment"])
+    #     pred_heading_residual = torch.gather(pred_heading_residual, 1, end_points["object_assignment"]).unsqueeze(-1)
+    #     pred_size_class = torch.gather(pred_size_class, 1, end_points["object_assignment"])
+    #     pred_size_residual = torch.gather(pred_size_residual, 1,
+    #                                       end_points["object_assignment"].unsqueeze(2).repeat(1, 1, 3))
+    #
+    #     end_points['center'] = pred_center
+    #     end_points['heading_scores'] = pred_heading_class
+    #     end_points['heading_residuals'] = pred_heading_residual
+    #     end_points['size_scores'] = pred_size_class
+    #     end_points['size_residuals'] = pred_size_residual
+
+
     # print(3+num_heading_bin*2+num_size_cluster*4, ' <<< bbox heading and size tensor shape')
     return end_points
 

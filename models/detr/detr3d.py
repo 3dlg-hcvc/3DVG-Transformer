@@ -163,25 +163,9 @@ class DETR3D(nn.Module):  # just as a backbone; encoding afterward
 
             outputs_coord[:, :, 5:23] = size_class_label.unsqueeze(dim=-1)
 
-            size_residual_label = torch.gather(output['size_residual_label'], 1,
-                                               object_assignment.unsqueeze(-1).repeat(1, 1, 3))
-
-            num_size_cluster = config.num_size_cluster
-            batch_size = object_assignment.shape[0]
-            size_label_one_hot = torch.cuda.FloatTensor(batch_size, size_class_label.shape[1], num_size_cluster).zero_()
-            size_label_one_hot.scatter_(2, size_class_label.unsqueeze(-1),
-                                        1)  # src==1 so it's *one-hot* (B,K,num_size_cluster)
-            size_label_one_hot_tiled = size_label_one_hot.unsqueeze(-1).repeat(1, 1, 1, 3)  # (B,K,num_size_cluster,3)
-            # predicted_size_residual_normalized = torch.sum(
-            #     output['size_residuals_normalized'] * size_label_one_hot_tiled,
-            #     2)  # (B,K,3)
-            mean_size_arr = config.mean_size_arr
-            mean_size_arr_expanded = torch.from_numpy(mean_size_arr.astype(np.float32)).cuda().unsqueeze(0).unsqueeze(
-                0)  # (1,1,num_size_cluster,3)
-
-            mean_size_label = torch.sum(size_label_one_hot_tiled * mean_size_arr_expanded, 2)
-            size_residual_label_normalized = size_residual_label / mean_size_label
-            outputs_coord[:, :, 23:77] = torch.zeros(size=(B, N, 54), device="cuda", dtype=torch.float32) #TODO
+            # size_residual_label = torch.gather(output['size_residual_label'], 1,
+            #                                    object_assignment)
+            # outputs_coord[:, :, 5:23] = size_class_label.unsqueeze(dim=-1)
 
             # num_heading_bin = config.num_heading_bin
             # num_size_cluster = config.num_size_cluster
@@ -204,6 +188,7 @@ class DETR3D(nn.Module):  # just as a backbone; encoding afterward
             # size_residual_label_normalized = size_residual_label / mean_size_label
 
             # outputs_coord[:, :, 23:77] = size_residual_label_normalized
+            outputs_coord[:, :, 23:77] = torch.zeros(size=(B, N, 54), device="cuda", dtype=torch.float32) #TODO
         # outputs_coord = outputs_coord.sigmoid() #No Sigmoid!!!
         # print(outputs_class.shape, outputs_coord.shape, 'output coord and class')
         if 'dec' in self.transformer_type or self.transformer_type.split(';')[-1] == 'deformable':

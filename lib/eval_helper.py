@@ -316,35 +316,39 @@ def get_eval_multi3drefer(data_dict, config):
 
     pred_results = {}
 
-    pred_center = data_dict['center'].detach().cpu().numpy()  # (B,K,3)
-    pred_heading_class = torch.argmax(data_dict['heading_scores'], -1)  # B,num_proposal
-    pred_heading_residual = torch.gather(data_dict['heading_residuals'], 2,
-                                         pred_heading_class.unsqueeze(-1))  # B,num_proposal,1
-    pred_heading_class = pred_heading_class.detach().cpu().numpy()  # B,num_proposal
-    pred_heading_residual = pred_heading_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal
-    pred_size_class = torch.argmax(data_dict['size_scores'], -1)  # B,num_proposal
+
 
     if not USE_GT:
+        pred_center = data_dict['center'].detach().cpu().numpy()  # (B,K,3)
+        pred_heading_class = torch.argmax(data_dict['heading_scores'], -1)  # B,num_proposal
+        pred_heading_residual = torch.gather(data_dict['heading_residuals'], 2,
+                                             pred_heading_class.unsqueeze(-1))  # B,num_proposal,1
+        pred_heading_class = pred_heading_class.detach().cpu().numpy()  # B,num_proposal
+        pred_heading_residual = pred_heading_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal
+        pred_size_class = torch.argmax(data_dict['size_scores'], -1)  # B,num_proposal
         pred_size_residual = torch.gather(data_dict['size_residuals'], 2,
                                           pred_size_class.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 1,
                                                                                              3))  # B,num_proposal,1,3
     else:
-        pred_size_residual = data_dict["size_residual_label"].unsqueeze(-2)
+        pred_center = data_dict["center_label"].cpu().numpy()
+        pred_heading_class = data_dict["heading_class_label"].cpu().numpy()
+        pred_heading_residual = data_dict["heading_residual_label"].cpu().numpy()
+        pred_size_class = data_dict["size_class_label"].cpu().numpy()
+        pred_size_residual = data_dict["size_residual_label"]
 
 
     pred_size_class = pred_size_class.detach().cpu().numpy()
     pred_size_residual = pred_size_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal,3
     gts = {}
     new_box_mask = data_dict["multi_ref_box_label_list"]
-
     for i in range(batch_size):
-
         pred_obb_batch = config.param2obb_batch(pred_center[i, :, 0:3], pred_heading_class[i],
                                                 pred_heading_residual[i],
                                                 pred_size_class[i], pred_size_residual[i])
         pred_bbox_corners = get_3d_box_batch(pred_obb_batch[:, 3:6], pred_obb_batch[:, 6], pred_obb_batch[:, 0:3])
-        min_max_bound = np.stack((pred_bbox_corners.min(1), pred_bbox_corners.max(1)), axis=1)
 
+
+        min_max_bound = np.stack((pred_bbox_corners.min(1), pred_bbox_corners.max(1)), axis=1)
         for j in range(lang_chunk_size):
             if j < data_dict["lang_num"][i]:
                 pred_aabbs = min_max_bound[pred_aabb_score_masks[i, j]]
@@ -354,6 +358,7 @@ def get_eval_multi3drefer(data_dict, config):
                 ] = {
                     "aabb_bound": pred_aabbs
                 }
+
 
                 single_box_mask = new_box_mask[i][j]
 
@@ -370,6 +375,11 @@ def get_eval_multi3drefer(data_dict, config):
                 gt_bbox_batch_new = get_3d_box_batch(gt_obb_batch_new[:, 3:6], gt_obb_batch_new[:, 6],
                                                      gt_obb_batch_new[:, 0:3])
 
+                # for box in gt_bbox_batch_new:
+                #     abb = o3d.geometry.AxisAlignedBoundingBox().create_from_points(o3d.utility.Vector3dVector(box))
+                #     abb.color = np.array([0, 1, 0])
+                #     vis_list.append(abb)
+
                 # gt_bboxes = gt_bboxes_list[i][single_mask]
                 gt_bboxes_bound = np.stack((gt_bbox_batch_new.min(1), gt_bbox_batch_new.max(1)), axis=1)
 
@@ -380,6 +390,7 @@ def get_eval_multi3drefer(data_dict, config):
                     "aabb_bound": gt_bboxes_bound,
                     "eval_type": data_dict["eval_type"][j][i]
                 }
+        #o3d.visualization.draw_geometries(vis_list)
 
 
     # batch_size = len(data_dict["scene_id"])
