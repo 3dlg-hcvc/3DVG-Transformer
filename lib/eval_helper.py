@@ -333,11 +333,11 @@ def get_eval_multi3drefer(data_dict, config):
         pred_center = data_dict["center_label"].cpu().numpy()
         pred_heading_class = data_dict["heading_class_label"].cpu().numpy()
         pred_heading_residual = data_dict["heading_residual_label"].cpu().numpy()
-        pred_size_class = data_dict["size_class_label"].cpu().numpy()
+        pred_size_class = data_dict["size_class_label"]
         pred_size_residual = data_dict["size_residual_label"]
 
 
-    pred_size_class = pred_size_class.detach().cpu().numpy()
+    pred_size_class = pred_size_class.cpu().numpy()
     pred_size_residual = pred_size_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal,3
     gts = {}
     new_box_mask = data_dict["multi_ref_box_label_list"]
