@@ -27,9 +27,13 @@ from macro import *
 
 if SCANREFER_ENHANCE:
     for item in SCANREFER_TRAIN:
-        item["object_id"] = 0
+        item["object_id"] = -1
+        if len(item["object_ids"]) > 0:
+            item["object_id"] = item["object_ids"][0]
     for item in SCANREFER_VAL:
-        item["object_id"] = 0
+        item["object_id"] = -1
+        if len(item["object_ids"]) > 0:
+            item["object_id"] = item["object_ids"][0]
 
 
 # constants
