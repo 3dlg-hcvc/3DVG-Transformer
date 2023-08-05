@@ -7,7 +7,6 @@ import torch
 import numpy as np
 
 
-from torch.utils.data._utils.collate import default_collate
 from torch.utils.data import DataLoader
 from datetime import datetime
 from copy import deepcopy
@@ -15,7 +14,6 @@ from copy import deepcopy
 sys.path.append(os.path.join(os.getcwd())) # HACK add the root folder
 
 from data.scannet.model_util_scannet import ScannetDatasetConfig
-from lib.pointgroup_ops.functions import pointgroup_ops
 from lib.dataset import ScannetReferenceDataset
 from lib.solver import Solver
 from lib.config import CONF
@@ -25,8 +23,14 @@ from scripts.utils.script_utils import set_params_lr_dict
 
 SCANREFER_TRAIN = json.load(open(os.path.join(CONF.PATH.DATA, "multi3drefer_train.json")))
 SCANREFER_VAL = json.load(open(os.path.join(CONF.PATH.DATA, "multi3drefer_val.json")))
-
 from macro import *
+
+if SCANREFER_ENHANCE:
+    for item in SCANREFER_TRAIN:
+        item["object_id"] = 0
+    for item in SCANREFER_VAL:
+        item["object_id"] = 0
+
 
 # constants
 DC = ScannetDatasetConfig()
