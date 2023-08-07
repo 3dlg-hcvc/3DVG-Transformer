@@ -20,7 +20,10 @@ from macro import *
 
 # data setting
 DC = ScannetDatasetConfig()
-MAX_NUM_OBJ = 256
+if not USE_GT:
+    MAX_NUM_OBJ = 256
+else:
+    MAX_NUM_OBJ = 128
 MEAN_COLOR_RGB = np.array([109.8, 97.2, 83.8])
 
 # data path
@@ -205,6 +208,12 @@ class ScannetReferenceDataset(Dataset):
         instance_labels = self.scene_data[scene_id]["instance_labels"]
         semantic_labels = self.scene_data[scene_id]["semantic_labels"]
         instance_bboxes = self.scene_data[scene_id]["instance_bboxes"]
+        # single_objs = self.scene_data[scene_id]["instance_single_objs"]
+        single_objs_idx = self.scene_data[scene_id]["instance_single_objs_idx"]
+
+
+
+
 
         if not self.use_color:
             point_cloud = mesh_vertices[:, 0:3] # do not use color for now
@@ -227,10 +236,22 @@ class ScannetReferenceDataset(Dataset):
             multiview = self.multiview_data[pid][scene_id]
             point_cloud = np.concatenate([point_cloud, multiview], 1)
 
+
+
         if self.use_height:
             floor_height = np.percentile(point_cloud[:,2],0.99)
             height = point_cloud[:,2] - floor_height
             point_cloud = np.concatenate([point_cloud, np.expand_dims(height, 1)],1)
+
+
+        if USE_GT:
+            all_objs = np.zeros(shape=(MAX_NUM_OBJ, 1024, 135), dtype=np.float32)
+            for i, inst_i in enumerate(single_objs_idx):
+                selected_points = point_cloud[inst_i]
+                n_points = len(selected_points)
+                selected = np.random.choice(n_points, 1024, replace=n_points < 1024)
+                all_objs[i] = selected_points[selected]
+                all_objs[i,:, 0:3] = all_objs[i,:, 0:3] - all_objs[i,:, 0:3].mean(axis=0)
 
         point_cloud, choices = random_sampling(point_cloud, self.num_points, return_choices=True)
         instance_labels = instance_labels[choices]
@@ -315,6 +336,10 @@ class ScannetReferenceDataset(Dataset):
 
             # Translation
             point_cloud, target_bboxes = self._translate(point_cloud, target_bboxes)
+
+
+
+
 
         # compute votes *AFTER* augmentation
         # generate votes
@@ -410,6 +435,8 @@ class ScannetReferenceDataset(Dataset):
         #     data_dict["gt_proposals_offset"] = gt_proposals_offset
 
         data_dict["point_clouds"] = point_cloud.astype(np.float32) # point cloud data including features
+        if USE_GT:
+            data_dict["single_obj_info"] = all_objs
         data_dict["unk"] = unk.astype(np.float32) # from glove
         data_dict["scene_id"] = scene_id
         data_dict["istrain"] = istrain
@@ -634,6 +661,9 @@ class ScannetReferenceDataset(Dataset):
             self.scene_data[scene_id]["semantic_labels"] = np.load(os.path.join(CONF.PATH.SCANNET_DATA, scene_id)+"_sem_label.npy")
             # self.scene_data[scene_id]["instance_bboxes"] = np.load(os.path.join(CONF.PATH.SCANNET_DATA, scene_id)+"_bbox.npy")
             self.scene_data[scene_id]["instance_bboxes"] = np.load(os.path.join(CONF.PATH.SCANNET_DATA, scene_id)+"_aligned_bbox.npy")
+            # self.scene_data[scene_id]["instance_single_objs"] = np.load(os.path.join(CONF.PATH.SCANNET_DATA, scene_id)+"_aligned_single_obj.npy")
+            self.scene_data[scene_id]["instance_single_objs_idx"] = np.load(
+                os.path.join(CONF.PATH.SCANNET_DATA, scene_id) + "_aligned_single_obj_idx.npy")
 
         # prepare class mapping
         lines = [line.rstrip() for line in open(SCANNET_V2_TSV)]

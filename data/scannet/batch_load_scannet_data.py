@@ -29,13 +29,14 @@ def export_one_scan(scan_name):
     agg_file = os.path.join(SCANNET_DIR, scan_name, scan_name + '.aggregation.json')
     seg_file = os.path.join(SCANNET_DIR, scan_name, scan_name + '_vh_clean_2.0.010000.segs.json')
     meta_file = os.path.join(SCANNET_DIR, scan_name, scan_name + '.txt') # includes axisAlignment info for the train set scans.   
-    mesh_vertices, aligned_vertices, semantic_labels, instance_labels, instance_bboxes, aligned_instance_bboxes = export(mesh_file, agg_file, seg_file, meta_file, LABEL_MAP_FILE, None)
+    mesh_vertices, aligned_vertices, semantic_labels, instance_labels, instance_bboxes, aligned_instance_bboxes, aligned_single_objs_idx = export(mesh_file, agg_file, seg_file, meta_file, LABEL_MAP_FILE, None)
 
     mask = np.logical_not(np.in1d(semantic_labels, DONOTCARE_CLASS_IDS))
     mesh_vertices = mesh_vertices[mask,:]
     aligned_vertices = aligned_vertices[mask,:]
     semantic_labels = semantic_labels[mask]
     instance_labels = instance_labels[mask]
+    aligned_single_objs_idx = aligned_single_objs_idx[:, mask]
 
     if instance_bboxes.shape[0] > 1:
         num_instances = len(np.unique(instance_labels))
@@ -45,6 +46,8 @@ def export_one_scan(scan_name):
         bbox_mask = np.in1d(instance_bboxes[:,-2], OBJ_CLASS_IDS) # match the mesh2cap
         instance_bboxes = instance_bboxes[bbox_mask,:]
         aligned_instance_bboxes = aligned_instance_bboxes[bbox_mask,:]
+        # aligned_single_objs = aligned_single_objs[bbox_mask,:]
+        aligned_single_objs_idx = aligned_single_objs_idx[bbox_mask,:]
         print('Num of care instances: ', instance_bboxes.shape[0])
     else:
         print("No semantic/instance annotation for test scenes")
@@ -56,6 +59,8 @@ def export_one_scan(scan_name):
         aligned_vertices = aligned_vertices[choices, :]
         semantic_labels = semantic_labels[choices]
         instance_labels = instance_labels[choices]
+        aligned_single_objs_idx = aligned_single_objs_idx[:, choices]
+
 
     print("Shape of points: {}".format(mesh_vertices.shape))
 
@@ -65,6 +70,8 @@ def export_one_scan(scan_name):
     np.save(output_filename_prefix+'_ins_label.npy', instance_labels)
     np.save(output_filename_prefix+'_bbox.npy', instance_bboxes)
     np.save(output_filename_prefix+'_aligned_bbox.npy', aligned_instance_bboxes)
+    np.save(output_filename_prefix + '_aligned_single_obj.npy', aligned_single_objs)
+    np.save(output_filename_prefix + '_aligned_single_obj_idx.npy', aligned_single_objs_idx)
 
 def batch_export():
     np.random.seed(123)

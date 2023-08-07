@@ -18,14 +18,14 @@ from macro import *
 
 def decode_scores_classes(output_dict, end_points, num_class, data_dict):
     pred_logits = output_dict['pred_logits']
-    if USE_GT:
-        final_fps_ind = torch.gather(data_dict["seed_inds"], dim=1, index=data_dict['aggregated_vote_inds'].long())
-        obj_scores = torch.gather(data_dict["vote_label_mask"], dim=1, index=final_fps_ind.long())
-        new_obj_scores = torch.unsqueeze(obj_scores, dim=-1)
-        objectness_scores = torch.cat([1 - new_obj_scores, new_obj_scores], dim=-1)
-    else:
-        assert pred_logits.shape[-1] == 2 + num_class, 'pred_logits.shape wrong'
-        objectness_scores = pred_logits[:, :, 0:2]  # TODO CHANGE IT; JUST SOFTMAXd
+    # if USE_GT:
+    #     final_fps_ind = torch.gather(data_dict["seed_inds"], dim=1, index=data_dict['aggregated_vote_inds'].long())
+    #     obj_scores = torch.gather(data_dict["vote_label_mask"], dim=1, index=final_fps_ind.long())
+    #     new_obj_scores = torch.unsqueeze(obj_scores, dim=-1)
+    #     objectness_scores = torch.cat([1 - new_obj_scores, new_obj_scores], dim=-1)
+    # else:
+    assert pred_logits.shape[-1] == 2 + num_class, 'pred_logits.shape wrong'
+    objectness_scores = pred_logits[:, :, 0:2]  # TODO CHANGE IT; JUST SOFTMAXd
 
     end_points['objectness_scores'] = objectness_scores
     sem_cls_scores = pred_logits[:,:,2:2+num_class] # Bxnum_proposalx10
@@ -151,14 +151,18 @@ class ProposalModule(nn.Module):
 
 
         if self.sampling == 'vote_fps':
-            seed_xyz, seed_features = end_points['seed_xyz'], features
-            # Farthest point sampling (FPS) on votes
-            xyz, features, fps_inds = self.vote_aggregation(xyz, features)
-            sample_inds = fps_inds
-            end_points['aggregated_vote_xyz'] = xyz  # (batch_size, num_proposal, 3)
-            end_points['aggregated_vote_features'] = features.permute(0, 2, 1).contiguous() # (batch_size, num_proposal, 128)
-            end_points['aggregated_vote_inds'] = sample_inds  # (batch_size, num_proposal,) # should be 0,1,2,...,num_proposal
-
+            if not USE_GT:
+                # seed_xyz, seed_features = end_points['seed_xyz'], features
+                # Farthest point sampling (FPS) on votes
+                xyz, features, fps_inds = self.vote_aggregation(xyz, features)
+                sample_inds = fps_inds
+                end_points['aggregated_vote_xyz'] = xyz  # (batch_size, num_proposal, 3)
+                end_points['aggregated_vote_features'] = features.permute(0, 2, 1).contiguous() # (batch_size, num_proposal, 128)
+                end_points['aggregated_vote_inds'] = sample_inds  # (batch_size, num_proposal,) # should be 0,1,2,...,num_proposal
+            else:
+                features = features.permute(0, 2, 1)
+                xyz = end_points['center_label'][:, :, 0:3]
+                end_points['aggregated_vote_xyz'] = xyz
             # --------- PROPOSAL GENERATION ----------  TODO PROPOSAL GENERATION AND CHANGE LOSS GENERATION
             # print(features.mean(), features.std(), ' << first,votenet forward features mean and std', flush=True) # TODO CHECK IT
             features = F.relu(self.bn1(self.conv1(features)))

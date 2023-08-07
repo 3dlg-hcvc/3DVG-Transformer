@@ -100,6 +100,8 @@ def export(mesh_file, agg_file, seg_file, meta_file, label_map_file, output_file
         
         instance_bboxes = np.zeros((num_instances,8)) # also include object id
         aligned_instance_bboxes = np.zeros((num_instances,8)) # also include object id
+        # aligned_single_objs = np.zeros((num_instances,1024, 9), dtype=np.float32)
+        aligned_single_objs_idx = np.zeros((num_instances, instance_ids.shape[0]), dtype=bool)
         for obj_id in object_id_to_segs:
             label_id = object_id_to_label_id[obj_id]
 
@@ -123,6 +125,7 @@ def export(mesh_file, agg_file, seg_file, meta_file, label_map_file, output_file
 
             # bboxes in the aligned meshes
             obj_pc = aligned_vertices[instance_ids==obj_id, 0:3]
+
             if len(obj_pc) == 0: continue
             # Compute axis aligned box
             # An axis aligned bounding box is parameterized by
@@ -137,6 +140,11 @@ def export(mesh_file, agg_file, seg_file, meta_file, label_map_file, output_file
             zmax = np.max(obj_pc[:,2])
             bbox = np.array([(xmin+xmax)/2, (ymin+ymax)/2, (zmin+zmax)/2, xmax-xmin, ymax-ymin, zmax-zmin, label_id, obj_id-1]) # also include object id
             # NOTE: this assumes obj_id is in 1,2,3,.,,,.NUM_INSTANCES
+            # n_points = len(aligned_vertices[instance_ids == obj_id])
+            # selected = np.random.choice(n_points, 1024, replace=n_points < 1024)
+            # aligned_single_objs[obj_id - 1] = aligned_vertices[instance_ids == obj_id][selected]
+            aligned_single_objs_idx[obj_id - 1] = instance_ids == obj_id
+
             aligned_instance_bboxes[obj_id-1,:] = bbox 
     else:
         # use zero as placeholders for the test scene
@@ -144,8 +152,10 @@ def export(mesh_file, agg_file, seg_file, meta_file, label_map_file, output_file
         num_verts = mesh_vertices.shape[0]
         label_ids = np.zeros(shape=(num_verts), dtype=np.uint32) # 0: unannotated
         instance_ids = np.zeros(shape=(num_verts), dtype=np.uint32) # 0: unannotated
+        aligned_single_objs = np.zeros((1, 9), dtype=np.float32)
         instance_bboxes = np.zeros((1, 8)) # also include object id
         aligned_instance_bboxes = np.zeros((1, 8)) # also include object id
+        aligned_single_objs_idx = np.zeros((1, instance_ids.shape[0]), dtype=np.float32)
 
     if output_file is not None:
         np.save(output_file+'_vert.npy', mesh_vertices)
@@ -154,8 +164,9 @@ def export(mesh_file, agg_file, seg_file, meta_file, label_map_file, output_file
         np.save(output_file+'_ins_label.npy', instance_ids)
         np.save(output_file+'_bbox.npy', instance_bboxes)
         np.save(output_file+'_aligned_bbox.npy', instance_bboxes)
+        np.save(output_file+'_aligned_single_obj.npy', aligned_single_objs)
 
-    return mesh_vertices, aligned_vertices, label_ids, instance_ids, instance_bboxes, aligned_instance_bboxes
+    return mesh_vertices, aligned_vertices, label_ids, instance_ids, instance_bboxes, aligned_instance_bboxes, aligned_single_objs_idx
 
 def main():
     parser = argparse.ArgumentParser()

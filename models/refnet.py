@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-
+from models.single_obj_encoder import PointNetPP
 from models.backbone_module import Pointnet2Backbone
 from models.voting_module import VotingModule
 from models.proposal_module import ProposalModule
@@ -31,11 +31,17 @@ class RefNet(nn.Module):
         self.dataset_config = dataset_config
 
         # --------- PROPOSAL GENERATION ---------
-        # Backbone point feature learning
-        self.backbone_net = Pointnet2Backbone(input_feature_dim=self.input_feature_dim)
+        if not USE_GT:
+            # Backbone point feature learning
+            self.backbone_net = Pointnet2Backbone(input_feature_dim=self.input_feature_dim)
 
-        # Hough voting
-        self.vgen = VotingModule(self.vote_factor, 256)
+            # Hough voting
+            self.vgen = VotingModule(self.vote_factor, 256)
+        else:
+            self.single_obj_encoder = PointNetPP(
+                sa_n_points=[32, 16, None], sa_n_samples=[32, 32, None],
+                sa_radii=[0.2, 0.4, None], sa_mlps=[[132, 64, 64, 128], [128, 128, 128, 256],[256, 256, 512, 128]]
+            )
 
         # Vote aggregation and object proposal
         config_transformer = None
@@ -100,19 +106,26 @@ class RefNet(nn.Module):
 
         # --------- HOUGH VOTING ---------
 
-        data_dict = self.backbone_net(data_dict)
-        # --------- HOUGH VOTING ---------
-        xyz = data_dict["fp2_xyz"]
-        features = data_dict["fp2_features"]
-        data_dict["seed_inds"] = data_dict["fp2_inds"]
-        data_dict["seed_xyz"] = xyz
-        data_dict["seed_features"] = features
+        if not USE_GT:
+            data_dict = self.backbone_net(data_dict)
+            # --------- HOUGH VOTING ---------
+            xyz = data_dict["fp2_xyz"]
+            features = data_dict["fp2_features"]
+            data_dict["seed_inds"] = data_dict["fp2_inds"]
+            data_dict["seed_xyz"] = xyz
+            data_dict["seed_features"] = features
 
-        xyz, features = self.vgen(data_dict, xyz, features, use_gt=USE_GT)
-        features_norm = torch.norm(features, p=2, dim=1)
-        features = features.div(features_norm.unsqueeze(1))
-        data_dict["vote_xyz"] = xyz
-        data_dict["vote_features"] = features
+            xyz, features = self.vgen(data_dict, xyz, features, use_gt=USE_GT)
+            features_norm = torch.norm(features, p=2, dim=1)
+            features = features.div(features_norm.unsqueeze(1))
+            data_dict["vote_xyz"] = xyz
+            data_dict["vote_features"] = features
+        else:
+            features = self.single_obj_encoder(data_dict["single_obj_info"].flatten(0, 1))
+            features = features.reshape(len(data_dict["scene_id"]), -1, features.shape[-1])
+            features_norm = torch.norm(features, p=2, dim=1)
+            features = features.div(features_norm.unsqueeze(1))
+            xyz = data_dict['center_label'][:, :, 0:3]
         data_dict = self.proposal(xyz, features, data_dict)
 
         # --------- PROPOSAL GENERATION ---------

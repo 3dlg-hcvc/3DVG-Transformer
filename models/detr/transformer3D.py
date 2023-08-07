@@ -27,17 +27,17 @@ def decode_scores_boxes(output_dict, end_points, num_heading_bin, num_size_clust
     if quality_channel:
         bbox_args_shape += 1
     assert pred_boxes.shape[-1] == bbox_args_shape, 'pred_boxes.shape wrong'
-    if not USE_GT:
-        if center_with_bias:
-            # print('CENTER ADDING VOTE-XYZ', flush=True)
-            # print('Using Center With Bias', output_dict.keys())
-            if 'transformer_weighted_xyz' in output_dict.keys():
-                # end_points['transformer_weighted_xyz_all'] = output_dict['transformer_weighted_xyz_all']  # just for visualization
-                transformer_xyz = output_dict['transformer_weighted_xyz']
-                # print(transformer_xyz[0, :4], base_xyz[0, :4], 'from vote helper', flush=True)
-                # print(center.shape, transformer_xyz.shape)
-                transformer_xyz = nn.functional.pad(transformer_xyz, (0, 3+num_heading_bin*2+num_size_cluster*4-transformer_xyz.shape[-1]))
-                pred_boxes = pred_boxes + transformer_xyz  # residual
+    # if not USE_GT:
+    if center_with_bias:
+        # print('CENTER ADDING VOTE-XYZ', flush=True)
+        # print('Using Center With Bias', output_dict.keys())
+        if 'transformer_weighted_xyz' in output_dict.keys():
+            # end_points['transformer_weighted_xyz_all'] = output_dict['transformer_weighted_xyz_all']  # just for visualization
+            transformer_xyz = output_dict['transformer_weighted_xyz']
+            # print(transformer_xyz[0, :4], base_xyz[0, :4], 'from vote helper', flush=True)
+            # print(center.shape, transformer_xyz.shape)
+            transformer_xyz = nn.functional.pad(transformer_xyz, (0, 3+num_heading_bin*2+num_size_cluster*4-transformer_xyz.shape[-1]))
+            pred_boxes = pred_boxes + transformer_xyz  # residual
 
         # else:
         #     raise NotImplementedError('You should add it to the transformer final xyz')

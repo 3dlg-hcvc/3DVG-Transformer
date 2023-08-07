@@ -142,53 +142,29 @@ class DETR3D(nn.Module):  # just as a backbone; encoding afterward
         detr_feat = hs.permute(1, 2, 0, 3).reshape(B, N, -1)
         detr_feat = nn.functional.relu(self.hidden_norm(self.hidden_ffn(detr_feat)))
 
-        if not USE_GT:
-            outputs_class = self.class_embed(detr_feat)
-            outputs_coord = self.bbox_embed(detr_feat)
-        else:
-            outputs_class = self.class_embed(detr_feat)
-            outputs_coord = self.bbox_embed(detr_feat)
-            # outputs_coord = torch.zeros(size=(B, N, 77), device="cuda", dtype=torch.float32)
-            outputs_coord[:,:,0:3] = output['center_label'][:, :, 0:3]
-
-            dist1, ind1, dist2, _ = nn_distance(output['aggregated_vote_xyz'], output['center_label'][:, :, 0:3])
-            object_assignment = ind1
-
-            outputs_coord[:, :, 3:4] = torch.gather(output['heading_class_label'], 1, object_assignment).unsqueeze(dim=-1)
-
-            heading_residual_label = torch.gather(output['heading_residual_label'], 1, object_assignment)  # select (B,K) from (B,K2)
-            outputs_coord[:, :, 4:5] = (heading_residual_label / (np.pi / 1)).unsqueeze(dim=-1)
-
-            size_class_label = torch.gather(output['size_class_label'], 1, object_assignment)
-
-            outputs_coord[:, :, 5:23] = size_class_label.unsqueeze(dim=-1)
-
-            # size_residual_label = torch.gather(output['size_residual_label'], 1,
-            #                                    object_assignment)
-            # outputs_coord[:, :, 5:23] = size_class_label.unsqueeze(dim=-1)
-
-            # num_heading_bin = config.num_heading_bin
-            # num_size_cluster = config.num_size_cluster
-            # num_class = config.num_class
-            # mean_size_arr = config.mean_size_arr
-            #
-            #
-            #
-            #
-            # batch_size = object_assignment.shape[0]
-            #
-            # size_label_one_hot = torch.cuda.FloatTensor(batch_size, size_class_label.shape[1], num_size_cluster).zero_()
-            # size_label_one_hot.scatter_(2, size_class_label.unsqueeze(-1),
-            #                             1)  # src==1 so it's *one-hot* (B,K,num_size_cluster)
-            # size_label_one_hot_tiled = size_label_one_hot.unsqueeze(-1).repeat(1, 1, 1, 3)
-            #
-            # mean_size_arr_expanded = torch.from_numpy(mean_size_arr.astype(np.float32)).cuda().unsqueeze(0).unsqueeze(
-            #     0)  # (1,1,num_size_cluster,3)
-            # mean_size_label = torch.sum(size_label_one_hot_tiled * mean_size_arr_expanded, 2)  # (B,K,3)
-            # size_residual_label_normalized = size_residual_label / mean_size_label
-
-            # outputs_coord[:, :, 23:77] = size_residual_label_normalized
-            outputs_coord[:, :, 23:77] = torch.zeros(size=(B, N, 54), device="cuda", dtype=torch.float32) #TODO
+        # if not USE_GT:
+        outputs_class = self.class_embed(detr_feat)
+        outputs_coord = self.bbox_embed(detr_feat)
+        # else:
+        #     outputs_class = self.class_embed(detr_feat)
+        #     outputs_coord = self.bbox_embed(detr_feat)
+        #     # outputs_coord = torch.zeros(size=(B, N, 77), device="cuda", dtype=torch.float32)
+        #     outputs_coord[:,:,0:3] = output['center_label'][:, :, 0:3]
+        #
+        #     dist1, ind1, dist2, _ = nn_distance(output['aggregated_vote_xyz'], output['center_label'][:, :, 0:3])
+        #     object_assignment = ind1
+        #
+        #     outputs_coord[:, :, 3:4] = torch.gather(output['heading_class_label'], 1, object_assignment).unsqueeze(dim=-1)
+        #
+        #     heading_residual_label = torch.gather(output['heading_residual_label'], 1, object_assignment)  # select (B,K) from (B,K2)
+        #     outputs_coord[:, :, 4:5] = (heading_residual_label / (np.pi / 1)).unsqueeze(dim=-1)
+        #
+        #     size_class_label = torch.gather(output['size_class_label'], 1, object_assignment)
+        #
+        #     outputs_coord[:, :, 5:23] = size_class_label.unsqueeze(dim=-1)
+        #
+        #
+        #     outputs_coord[:, :, 23:77] = torch.zeros(size=(B, N, 54), device="cuda", dtype=torch.float32) #TODO
         # outputs_coord = outputs_coord.sigmoid() #No Sigmoid!!!
         # print(outputs_class.shape, outputs_coord.shape, 'output coord and class')
         if 'dec' in self.transformer_type or self.transformer_type.split(';')[-1] == 'deformable':
