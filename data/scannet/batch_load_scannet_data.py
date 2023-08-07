@@ -64,13 +64,13 @@ def export_one_scan(scan_name):
 
     print("Shape of points: {}".format(mesh_vertices.shape))
 
-    np.save(output_filename_prefix+'_vert.npy', mesh_vertices)
-    np.save(output_filename_prefix+'_aligned_vert.npy', aligned_vertices)
-    np.save(output_filename_prefix+'_sem_label.npy', semantic_labels)
-    np.save(output_filename_prefix+'_ins_label.npy', instance_labels)
-    np.save(output_filename_prefix+'_bbox.npy', instance_bboxes)
-    np.save(output_filename_prefix+'_aligned_bbox.npy', aligned_instance_bboxes)
-    np.save(output_filename_prefix + '_aligned_single_obj.npy', aligned_single_objs)
+    # np.save(output_filename_prefix+'_vert.npy', mesh_vertices)
+    # np.save(output_filename_prefix+'_aligned_vert.npy', aligned_vertices)
+    # np.save(output_filename_prefix+'_sem_label.npy', semantic_labels)
+    # np.save(output_filename_prefix+'_ins_label.npy', instance_labels)
+    # np.save(output_filename_prefix+'_bbox.npy', instance_bboxes)
+    # np.save(output_filename_prefix+'_aligned_bbox.npy', aligned_instance_bboxes)
+    # np.save(output_filename_prefix + '_aligned_single_obj.npy', aligned_single_objs)
     np.save(output_filename_prefix + '_aligned_single_obj_idx.npy', aligned_single_objs_idx)
 
 def batch_export():
