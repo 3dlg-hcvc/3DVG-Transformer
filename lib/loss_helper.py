@@ -252,12 +252,12 @@ def compute_reference_loss(data_dict, config, no_reference=False):
         pred_size_residual = data_dict['size_residual_label']  # B,K2,3
 
         # assign
-        pred_center = torch.gather(pred_center, 1, data_dict["object_assignment"].unsqueeze(2).repeat(1, 1, 3))
-        pred_heading_class = torch.gather(pred_heading_class, 1, data_dict["object_assignment"])
-        pred_heading_residual = torch.gather(pred_heading_residual, 1, data_dict["object_assignment"]).unsqueeze(-1)
-        pred_size_class = torch.gather(pred_size_class, 1, data_dict["object_assignment"])
+        pred_center = torch.gather(pred_center, 1, data_dict["object_assignment"].unsqueeze(2).repeat(1, 1, 3)).cpu().numpy()
+        pred_heading_class = torch.gather(pred_heading_class, 1, data_dict["object_assignment"]).cpu().numpy()
+        pred_heading_residual = torch.gather(pred_heading_residual, 1, data_dict["object_assignment"]).unsqueeze(-1).cpu().numpy()
+        pred_size_class = torch.gather(pred_size_class, 1, data_dict["object_assignment"]).cpu().numpy()
         pred_size_residual = torch.gather(pred_size_residual, 1,
-                                          data_dict["object_assignment"].unsqueeze(2).repeat(1, 1, 3))
+                                          data_dict["object_assignment"].unsqueeze(2).repeat(1, 1, 3)).cpu().numpy()
 
 
     # update
@@ -315,7 +315,7 @@ def compute_reference_loss(data_dict, config, no_reference=False):
         if not USE_GT:
             objectness_masks = data_dict['objectness_scores'].max(2)[1].float().cpu().numpy() # batch_size, num_proposals
         else:
-            objectness_masks = data_dict["tmp_objectness_masks"].float().cpu().numpy()
+            objectness_masks = data_dict["tmp_objectness_masks"].squeeze().float().cpu().numpy()
 
         gt_obb_batch = config.param2obb_batch(gt_center_list[i][:, 0:3], gt_heading_class_list[i],
                                               gt_heading_residual_list[i],
