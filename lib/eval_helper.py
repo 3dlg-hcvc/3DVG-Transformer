@@ -317,23 +317,31 @@ def get_eval_multi3drefer(data_dict, config):
     pred_results = {}
 
 
-    # if not USE_GT:
-    pred_center = data_dict['center'].detach().cpu().numpy()  # (B,K,3)
-    pred_heading_class = torch.argmax(data_dict['heading_scores'], -1)  # B,num_proposal
-    pred_heading_residual = torch.gather(data_dict['heading_residuals'], 2,
-                                         pred_heading_class.unsqueeze(-1))  # B,num_proposal,1
-    pred_heading_class = pred_heading_class.detach().cpu().numpy()  # B,num_proposal
-    pred_heading_residual = pred_heading_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal
-    pred_size_class = torch.argmax(data_dict['size_scores'], -1)  # B,num_proposal
-    pred_size_residual = torch.gather(data_dict['size_residuals'], 2,
-                                      pred_size_class.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 1,
-                                                                                         3))  # B,num_proposal,1,3
-    # else:
-    #     pred_center = data_dict["center_label"].cpu().numpy()
-    #     pred_heading_class = data_dict["heading_class_label"].cpu().numpy()
-    #     pred_heading_residual = data_dict["heading_residual_label"].cpu().numpy()
-    #     pred_size_class = data_dict["size_class_label"]
-    #     pred_size_residual = data_dict["size_residual_label"]
+    if not USE_GT:
+        pred_center = data_dict['center'].detach().cpu().numpy()  # (B,K,3)
+        pred_heading_class = torch.argmax(data_dict['heading_scores'], -1)  # B,num_proposal
+        pred_heading_residual = torch.gather(data_dict['heading_residuals'], 2,
+                                             pred_heading_class.unsqueeze(-1))  # B,num_proposal,1
+        pred_heading_class = pred_heading_class.detach().cpu().numpy()  # B,num_proposal
+        pred_heading_residual = pred_heading_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal
+        pred_size_class = torch.argmax(data_dict['size_scores'], -1)  # B,num_proposal
+        pred_size_residual = torch.gather(data_dict['size_residuals'], 2,
+                                          pred_size_class.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 1,
+                                                                                             3))  # B,num_proposal,1,3
+    else:
+        pred_center = data_dict['center_label']  # (B,MAX_NUM_OBJ,3)
+        pred_heading_class = data_dict['heading_class_label']  # B,K2
+        pred_heading_residual = data_dict['heading_residual_label']  # B,K2
+        pred_size_class = data_dict['size_class_label']  # B,K2
+        pred_size_residual = data_dict['size_residual_label']  # B,K2,3
+
+        # assign
+        pred_center = torch.gather(pred_center, 1, data_dict["object_assignment"].unsqueeze(2).repeat(1, 1, 3)).detach().cpu().numpy()
+        pred_heading_class = torch.gather(pred_heading_class, 1, data_dict["object_assignment"]).cpu().numpy()
+        pred_heading_residual = torch.gather(pred_heading_residual, 1, data_dict["object_assignment"]).unsqueeze(-1).cpu().numpy()
+        pred_size_class = torch.gather(pred_size_class, 1, data_dict["object_assignment"])
+        pred_size_residual = torch.gather(pred_size_residual, 1,
+                                          data_dict["object_assignment"].unsqueeze(2).repeat(1, 1, 3))
 
 
     pred_size_class = pred_size_class.cpu().numpy()
@@ -346,17 +354,17 @@ def get_eval_multi3drefer(data_dict, config):
                                                 pred_size_class[i], pred_size_residual[i])
         pred_bbox_corners = get_3d_box_batch(pred_obb_batch[:, 3:6], pred_obb_batch[:, 6], pred_obb_batch[:, 0:3])
 
-        import open3d as o3d
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(data_dict["point_clouds"][i, :, 0:3].cpu().numpy())
-        pcd.colors = o3d.utility.Vector3dVector((data_dict["pcl_color"][i].cpu().numpy() / 255))
-        vis_list = [pcd]
-        for box in pred_bbox_corners:
-            abb = o3d.geometry.AxisAlignedBoundingBox().create_from_points(o3d.utility.Vector3dVector(box))
-            abb.color = np.array([1, 0, 0])
-            vis_list.append(abb)
-
-        o3d.visualization.draw_geometries(vis_list)
+        # import open3d as o3d
+        # pcd = o3d.geometry.PointCloud()
+        # pcd.points = o3d.utility.Vector3dVector(data_dict["point_clouds"][i, :, 0:3].cpu().numpy())
+        # pcd.colors = o3d.utility.Vector3dVector((data_dict["pcl_color"][i].cpu().numpy() / 255))
+        # vis_list = [pcd]
+        # for box in pred_bbox_corners:
+        #     abb = o3d.geometry.AxisAlignedBoundingBox().create_from_points(o3d.utility.Vector3dVector(box))
+        #     abb.color = np.array([1, 0, 0])
+        #     vis_list.append(abb)
+        #
+        # o3d.visualization.draw_geometries(vis_list)
         min_max_bound = np.stack((pred_bbox_corners.min(1), pred_bbox_corners.max(1)), axis=1)
         for j in range(lang_chunk_size):
             if j < data_dict["lang_num"][i]:
