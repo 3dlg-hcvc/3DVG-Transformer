@@ -328,31 +328,52 @@ def get_eval_multi3drefer(data_dict, config):
         pred_size_residual = torch.gather(data_dict['size_residuals'], 2,
                                           pred_size_class.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 1,
                                                                                              3))  # B,num_proposal,1,3
+        pred_size_class = pred_size_class.cpu().numpy()
+        pred_size_residual = pred_size_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal,3
     else:
-        pred_center = data_dict['center_label']  # (B,MAX_NUM_OBJ,3)
-        pred_heading_class = data_dict['heading_class_label']  # B,K2
-        pred_heading_residual = data_dict['heading_residual_label']  # B,K2
-        pred_size_class = data_dict['size_class_label']  # B,K2
-        pred_size_residual = data_dict['size_residual_label']  # B,K2,3
+        # pred_center = data_dict['center_label']  # (B,MAX_NUM_OBJ,3)
+        # pred_heading_class = data_dict['heading_class_label']  # B,K2
+        # pred_heading_residual = data_dict['heading_residual_label']  # B,K2
+        # pred_size_class = data_dict['size_class_label']  # B,K2
+        # pred_size_residual = data_dict['size_residual_label']  # B,K2,3
+        #
+        # # assign
+        # pred_center = torch.gather(pred_center, 1, data_dict["object_assignment"].unsqueeze(2).repeat(1, 1, 3)).detach().cpu().numpy()
+        # pred_heading_class = torch.gather(pred_heading_class, 1, data_dict["object_assignment"]).cpu().numpy()
+        # pred_heading_residual = torch.gather(pred_heading_residual, 1, data_dict["object_assignment"]).unsqueeze(-1).cpu().numpy()
+        # pred_size_class = torch.gather(pred_size_class, 1, data_dict["object_assignment"])
+        # pred_size_residual = torch.gather(pred_size_residual, 1,
+        #                                   data_dict["object_assignment"].unsqueeze(2).repeat(1, 1, 3))
+        pred_heading = torch.zeros(
+            size=(data_dict["heading_class_label"].shape[0], data_dict["heading_class_label"].shape[1]),
+            dtype=torch.float32, device="cuda")
+        pred_center = data_dict["center_label"]
+        pred_size = data_dict["gt_size"]
 
-        # assign
-        pred_center = torch.gather(pred_center, 1, data_dict["object_assignment"].unsqueeze(2).repeat(1, 1, 3)).detach().cpu().numpy()
-        pred_heading_class = torch.gather(pred_heading_class, 1, data_dict["object_assignment"]).cpu().numpy()
-        pred_heading_residual = torch.gather(pred_heading_residual, 1, data_dict["object_assignment"]).unsqueeze(-1).cpu().numpy()
-        pred_size_class = torch.gather(pred_size_class, 1, data_dict["object_assignment"])
-        pred_size_residual = torch.gather(pred_size_residual, 1,
-                                          data_dict["object_assignment"].unsqueeze(2).repeat(1, 1, 3))
+        pred_heading = pred_heading.detach().cpu().numpy()  # B,num_proposal
+        pred_center = pred_center.detach().cpu().numpy()  # (B, num_proposal)
+        pred_box_size = pred_size.detach().cpu().numpy()  # (B, num_proposal, 3)
+
+        # pred_bboxes = get_3d_box_batch(pred_box_size, pred_heading, pred_center)
+        # pred_bboxes = torch.from_numpy(pred_bboxes).float().to(
+        #     "cuda")  # .reshape(bsize, num_proposal, 8, 3)
+        # data_dict['pred_bbox_corner'] = pred_bboxes
 
 
-    pred_size_class = pred_size_class.cpu().numpy()
-    pred_size_residual = pred_size_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal,3
+
     gts = {}
     new_box_mask = data_dict["multi_ref_box_label_list"]
     for i in range(batch_size):
-        pred_obb_batch = config.param2obb_batch(pred_center[i, :, 0:3], pred_heading_class[i],
-                                                pred_heading_residual[i],
-                                                pred_size_class[i], pred_size_residual[i])
-        pred_bbox_corners = get_3d_box_batch(pred_obb_batch[:, 3:6], pred_obb_batch[:, 6], pred_obb_batch[:, 0:3])
+        if not USE_GT:
+            pred_obb_batch = config.param2obb_batch(pred_center[i, :, 0:3], pred_heading_class[i],
+                                                    pred_heading_residual[i],
+                                                    pred_size_class[i], pred_size_residual[i])
+            pred_bbox_corners = get_3d_box_batch(pred_obb_batch[:, 3:6], pred_obb_batch[:, 6], pred_obb_batch[:, 0:3])
+        else:
+            pred_center_batch = pred_center[i]
+            pred_heading_batch = pred_heading[i]
+            pred_box_size_batch = pred_box_size[i]
+            pred_bbox_corners = get_3d_box_batch(pred_box_size_batch, pred_heading_batch, pred_center_batch)
 
         # import open3d as o3d
         # pcd = o3d.geometry.PointCloud()
@@ -391,6 +412,26 @@ def get_eval_multi3drefer(data_dict, config):
 
                 gt_bbox_batch_new = get_3d_box_batch(gt_obb_batch_new[:, 3:6], gt_obb_batch_new[:, 6],
                                                      gt_obb_batch_new[:, 0:3])
+
+                # print(data_dict["scene_id"][i])
+                # print(data_dict["ann_id"][i][j])
+                # import open3d as o3d
+                # pcd = o3d.geometry.PointCloud()
+                # pcd.points = o3d.utility.Vector3dVector(data_dict["point_clouds"][i, :, 0:3].cpu().numpy())
+                # pcd.colors = o3d.utility.Vector3dVector((data_dict["pcl_color"][i].cpu().numpy() / 255))
+                # vis_list = [pcd]
+                # for box in pred_bbox_corners[pred_aabb_score_masks[i, j]]:
+                #     abb = o3d.geometry.AxisAlignedBoundingBox().create_from_points(o3d.utility.Vector3dVector(box))
+                #     abb.color = np.array([1, 0, 0])
+                #     abb.scale(1.2, abb.get_center())
+                #     vis_list.append(abb)
+                #
+                # for box in gt_bbox_batch_new:
+                #     abb = o3d.geometry.AxisAlignedBoundingBox().create_from_points(o3d.utility.Vector3dVector(box))
+                #     abb.color = np.array([0, 1, 0])
+                #     vis_list.append(abb)
+                #
+                # o3d.visualization.draw_geometries(vis_list)
 
                 # for box in gt_bbox_batch_new:
                 #     abb = o3d.geometry.AxisAlignedBoundingBox().create_from_points(o3d.utility.Vector3dVector(box))

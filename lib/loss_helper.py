@@ -335,6 +335,9 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                                                 pred_heading_residual[i],
                                                 pred_size_class[i], pred_size_residual[i])
         pred_bbox_batch = get_3d_box_batch(pred_obb_batch[:, 3:6], pred_obb_batch[:, 6], pred_obb_batch[:, 0:3])
+
+
+
         for j in range(len_nun_max):
             if j < lang_num[i]:
                 ious = box3d_iou_batch(pred_bbox_batch, np.tile(gt_bbox_batch[j], (num_proposals, 1, 1)))
@@ -365,6 +368,27 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                     gt_bbox_batch_new = get_3d_box_batch(gt_obb_batch_new[:, 3:6], gt_obb_batch_new[:, 6], gt_obb_batch_new[:, 0:3])
 
                     iou_matrix = np.zeros(shape=(gt_bbox_batch_new.shape[0], ious.shape[0]))
+
+                    # print(data_dict["scene_id"][i])
+                    # print(data_dict["ann_id"][i][j])
+                    # import open3d as o3d
+                    # pcd = o3d.geometry.PointCloud()
+                    # pcd.points = o3d.utility.Vector3dVector(data_dict["point_clouds"][i, :, 0:3].cpu().numpy())
+                    # pcd.colors = o3d.utility.Vector3dVector((data_dict["pcl_color"][i].cpu().numpy() / 255))
+                    # vis_list = [pcd]
+                    # for box in pred_bbox_batch:
+                    #     abb = o3d.geometry.AxisAlignedBoundingBox().create_from_points(o3d.utility.Vector3dVector(box))
+                    #     abb.color = np.array([1, 0, 0])
+                    #     abb.scale(1.2, abb.get_center())
+                    #     vis_list.append(abb)
+                    #
+                    # for box in gt_bbox_batch_new:
+                    #     abb = o3d.geometry.AxisAlignedBoundingBox().create_from_points(o3d.utility.Vector3dVector(box))
+                    #     abb.color = np.array([0, 1, 0])
+                    #     vis_list.append(abb)
+                    #
+                    # o3d.visualization.draw_geometries(vis_list)
+
                     for k, gt_bbox in enumerate(gt_bbox_batch_new):
                         ious = box3d_iou_batch(pred_bbox_batch, np.tile(gt_bbox, (num_proposals, 1, 1)))
                         if data_dict["istrain"][0] == 1 and not no_reference and data_dict["random"] < 0.5:

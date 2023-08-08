@@ -264,7 +264,7 @@ class ScannetReferenceDataset(Dataset):
         angle_residuals = np.zeros((MAX_NUM_OBJ,))
         size_classes = np.zeros((MAX_NUM_OBJ,))
         size_residuals = np.zeros((MAX_NUM_OBJ, 3))
-
+        box_size = np.zeros((MAX_NUM_OBJ, 3))
         ref_box_label_list = []
 
 
@@ -361,7 +361,7 @@ class ScannetReferenceDataset(Dataset):
         # NOTE: set size class as semantic class. Consider use size2class.
         size_classes[0:num_bbox] = class_ind
         size_residuals[0:num_bbox, :] = target_bboxes[0:num_bbox, 3:6] - DC.mean_size_arr[class_ind,:]
-
+        box_size[0:num_bbox, :] = target_bboxes[0:num_bbox, 3:6]
         # construct the reference target label for each bbox
         for j in range(self.lang_num_max):
             ref_box_label = np.zeros(MAX_NUM_OBJ, dtype=bool)
@@ -451,7 +451,7 @@ class ScannetReferenceDataset(Dataset):
         data_dict["vote_label_mask"] = point_votes_mask.astype(np.int64)
         data_dict["scan_idx"] = np.array(idx).astype(np.int64)
         data_dict["pcl_color"] = pcl_color
-
+        data_dict["gt_size"] = box_size.astype(np.float32)
         data_dict["lang_num"] = np.array(lang_num).astype(np.int64)
         data_dict["lang_feat_list"] = np.array(lang_feat_list).astype(np.float32)  # language feature vectors
         data_dict["lang_len_list"] = np.array(lang_len_list).astype(np.int64)  # length of each description
