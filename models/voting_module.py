@@ -30,7 +30,7 @@ class VotingModule(nn.Module):
         self.bn1 = torch.nn.BatchNorm1d(self.in_dim)
         self.bn2 = torch.nn.BatchNorm1d(self.in_dim)
         
-    def forward(self, data_dict, seed_xyz, seed_features, use_gt=False):
+    def forward(self, data_dict, seed_xyz, seed_features):
         """ Forward pass.
 
         Arguments:

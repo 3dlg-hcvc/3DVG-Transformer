@@ -93,6 +93,7 @@ def compute_objectness_loss(data_dict):
     # Associate proposal and GT objects by point-to-point distances
     aggregated_vote_xyz = data_dict['aggregated_vote_xyz']
     gt_center = data_dict['center_label'][:, :, 0:3]
+
     B = gt_center.shape[0]
     K = aggregated_vote_xyz.shape[1]
     # K2 = gt_center.shape[1]
@@ -230,18 +231,33 @@ def compute_reference_loss(data_dict, config, no_reference=False):
 
     # predicted bbox
     # pred_ref = data_dict['cluster_ref'].detach().cpu().numpy() # (B,)
-    pred_center = data_dict['center'].detach().cpu().numpy()  # (B,K,3)
-    pred_heading_class = torch.argmax(data_dict['heading_scores'], -1)  # B,num_proposal
-    pred_heading_residual = torch.gather(data_dict['heading_residuals'], 2,
-                                         pred_heading_class.unsqueeze(-1))  # B,num_proposal,1
-    pred_heading_class = pred_heading_class.detach().cpu().numpy()  # B,num_proposal
-    pred_heading_residual = pred_heading_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal
-    pred_size_class = torch.argmax(data_dict['size_scores'], -1)  # B,num_proposal
-    pred_size_residual = torch.gather(data_dict['size_residuals'], 2,
-                                      pred_size_class.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 1,
-                                                                                         3))  # B,num_proposal,1,3
-    pred_size_class = pred_size_class.detach().cpu().numpy()
-    pred_size_residual = pred_size_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal,3
+    if not USE_GT:
+        pred_center = data_dict['center'].detach().cpu().numpy()  # (B,K,3)
+        pred_heading_class = torch.argmax(data_dict['heading_scores'], -1)  # B,num_proposal
+        pred_heading_residual = torch.gather(data_dict['heading_residuals'], 2,
+                                             pred_heading_class.unsqueeze(-1))  # B,num_proposal,1
+        pred_heading_class = pred_heading_class.detach().cpu().numpy()  # B,num_proposal
+        pred_heading_residual = pred_heading_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal
+        pred_size_class = torch.argmax(data_dict['size_scores'], -1)  # B,num_proposal
+        pred_size_residual = torch.gather(data_dict['size_residuals'], 2,
+                                          pred_size_class.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 1,
+                                                                                             3))  # B,num_proposal,1,3
+        pred_size_class = pred_size_class.detach().cpu().numpy()
+        pred_size_residual = pred_size_residual.squeeze(2).detach().cpu().numpy()  # B,num_proposal,3
+    else:
+        pred_center = data_dict['center_label']  # (B,MAX_NUM_OBJ,3)
+        pred_heading_class = data_dict['heading_class_label']  # B,K2
+        pred_heading_residual = data_dict['heading_residual_label']  # B,K2
+        pred_size_class = data_dict['size_class_label']  # B,K2
+        pred_size_residual = data_dict['size_residual_label']  # B,K2,3
+
+        # assign
+        pred_center = torch.gather(pred_center, 1, data_dict["object_assignment"].unsqueeze(2).repeat(1, 1, 3))
+        pred_heading_class = torch.gather(pred_heading_class, 1, data_dict["object_assignment"])
+        pred_heading_residual = torch.gather(pred_heading_residual, 1, data_dict["object_assignment"]).unsqueeze(-1)
+        pred_size_class = torch.gather(pred_size_class, 1, data_dict["object_assignment"])
+        pred_size_residual = torch.gather(pred_size_residual, 1,
+                                          data_dict["object_assignment"].unsqueeze(2).repeat(1, 1, 3))
 
 
     # update
@@ -296,8 +312,10 @@ def compute_reference_loss(data_dict, config, no_reference=False):
     gt_labels = np.zeros((batch_size, len_nun_max, num_proposals))
 
     for i in range(batch_size):
-
-        objectness_masks = data_dict['objectness_scores'].max(2)[1].float().cpu().numpy() # batch_size, num_proposals
+        if not USE_GT:
+            objectness_masks = data_dict['objectness_scores'].max(2)[1].float().cpu().numpy() # batch_size, num_proposals
+        else:
+            objectness_masks = data_dict["tmp_objectness_masks"].float().cpu().numpy()
 
         gt_obb_batch = config.param2obb_batch(gt_center_list[i][:, 0:3], gt_heading_class_list[i],
                                               gt_heading_residual_list[i],
@@ -412,13 +430,14 @@ def get_loss(data_dict, config, detection=True, reference=True, use_lang_classif
     # Vote loss
 
     # Obj loss
-    objectness_loss, objectness_label, objectness_mask, object_assignment = compute_objectness_loss(data_dict)
-    data_dict['objectness_label'] = objectness_label
-    data_dict['objectness_mask'] = objectness_mask
-    data_dict['object_assignment'] = object_assignment
+
 
     if not USE_GT:
         vote_loss = compute_vote_loss(data_dict)
+        objectness_loss, objectness_label, objectness_mask, object_assignment = compute_objectness_loss(data_dict)
+        data_dict['objectness_label'] = objectness_label
+        data_dict['objectness_mask'] = objectness_mask
+        data_dict['object_assignment'] = object_assignment
 
 
         # num_proposal = objectness_label.shape[1]
@@ -427,10 +446,10 @@ def get_loss(data_dict, config, detection=True, reference=True, use_lang_classif
         # data_dict['pos_ratio'] = torch.sum(objectness_label.float().cuda()) / float(total_num_proposal)
         # data_dict['neg_ratio'] = torch.sum(objectness_mask.float()) / float(total_num_proposal) - data_dict['pos_ratio']
 
-    # Box loss and sem cls loss
-    center_loss, heading_cls_loss, heading_reg_loss, size_cls_loss, size_reg_loss, sem_cls_loss = compute_box_and_sem_cls_loss(
-        data_dict, config)
-    box_loss = center_loss + 0.1 * heading_cls_loss + heading_reg_loss + 0.1 * size_cls_loss + size_reg_loss
+        # Box loss and sem cls loss
+        center_loss, heading_cls_loss, heading_reg_loss, size_cls_loss, size_reg_loss, sem_cls_loss = compute_box_and_sem_cls_loss(
+            data_dict, config)
+        box_loss = center_loss + 0.1 * heading_cls_loss + heading_reg_loss + 0.1 * size_cls_loss + size_reg_loss
 
     # if detection and not USE_GT:
 
@@ -443,8 +462,8 @@ def get_loss(data_dict, config, detection=True, reference=True, use_lang_classif
         # data_dict['heading_reg_loss'] = heading_reg_loss
         # data_dict['size_cls_loss'] = size_cls_loss
         # data_dict['size_reg_loss'] = size_reg_loss
-        data_dict['sem_cls_loss'] = sem_cls_loss
-        data_dict['box_loss'] = box_loss
+            data_dict['sem_cls_loss'] = sem_cls_loss
+            data_dict['box_loss'] = box_loss
 
 
     if reference:
@@ -477,10 +496,7 @@ def get_loss(data_dict, config, detection=True, reference=True, use_lang_classif
         if not USE_GT:
             loss = data_dict['vote_loss'] + 0.1 * data_dict['objectness_loss'] + data_dict['box_loss'] + 0.1 * data_dict[
                 'sem_cls_loss']
-        else:
-            loss = data_dict['box_loss'] + 0.1 * \
-                   data_dict[
-                       'sem_cls_loss']
+
     loss += (0.03 * data_dict["ref_loss"] + 0.03 * data_dict["lang_loss"])
 
     loss *= 10  # amplify

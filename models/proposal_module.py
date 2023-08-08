@@ -15,7 +15,7 @@ from models.detr.detr3d import DETR3D
 from models.detr.transformer3D import decode_scores_boxes
 from utils.box_util import get_3d_box_batch
 from macro import *
-
+from utils.nn_distance import nn_distance
 def decode_scores_classes(output_dict, end_points, num_class, data_dict):
     pred_logits = output_dict['pred_logits']
     # if USE_GT:
@@ -160,9 +160,10 @@ class ProposalModule(nn.Module):
                 end_points['aggregated_vote_features'] = features.permute(0, 2, 1).contiguous() # (batch_size, num_proposal, 128)
                 end_points['aggregated_vote_inds'] = sample_inds  # (batch_size, num_proposal,) # should be 0,1,2,...,num_proposal
             else:
-                features = features.permute(0, 2, 1)
                 xyz = end_points['center_label'][:, :, 0:3]
                 end_points['aggregated_vote_xyz'] = xyz
+                end_points['aggregated_vote_features'] = features
+                features = features.permute(0, 2, 1)
             # --------- PROPOSAL GENERATION ----------  TODO PROPOSAL GENERATION AND CHANGE LOSS GENERATION
             # print(features.mean(), features.std(), ' << first,votenet forward features mean and std', flush=True) # TODO CHECK IT
             features = F.relu(self.bn1(self.conv1(features)))
@@ -194,8 +195,13 @@ class ProposalModule(nn.Module):
         # else:
         #     raise NotImplementedError(self.position_type)
         # output_dict = self.detr(xyz, features, end_points)
-        end_points = decode_scores(output_dict, end_points, self.num_class, self.num_heading_bin, self.num_size_cluster, self.mean_size_arr,
-                                   self.center_with_bias, quality_channel=self.quality_channel, dataset_config=self.dataset_config)
+        if not USE_GT:
+            end_points = decode_scores(output_dict, end_points, self.num_class, self.num_heading_bin, self.num_size_cluster, self.mean_size_arr,
+                                       self.center_with_bias, quality_channel=self.quality_channel, dataset_config=self.dataset_config)
+        else:
+            end_points['center'] = end_points['center_label'][:, :, 0:3]
+
+
 
         return end_points
 

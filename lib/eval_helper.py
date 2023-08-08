@@ -9,9 +9,9 @@ import numpy as np
 import sys
 import os
 
-from utils.nn_distance import nn_distance, huber_loss
+# from utils.nn_distance import nn_distance, huber_loss
 # from lib.ap_helper import parse_predictions
-from lib.loss import SoftmaxRankingLoss
+# from lib.loss import SoftmaxRankingLoss
 from utils.box_util import get_3d_box, get_3d_box_batch, box3d_iou
 
 from macro import *
@@ -346,17 +346,17 @@ def get_eval_multi3drefer(data_dict, config):
                                                 pred_size_class[i], pred_size_residual[i])
         pred_bbox_corners = get_3d_box_batch(pred_obb_batch[:, 3:6], pred_obb_batch[:, 6], pred_obb_batch[:, 0:3])
 
-        # import open3d as o3d
-        # pcd = o3d.geometry.PointCloud()
-        # pcd.points = o3d.utility.Vector3dVector(data_dict["point_clouds"][i, :, 0:3].cpu().numpy())
-        # pcd.colors = o3d.utility.Vector3dVector((data_dict["pcl_color"][i].cpu().numpy() / 255))
-        # vis_list = [pcd]
-        # for box in pred_bbox_corners:
-        #     abb = o3d.geometry.AxisAlignedBoundingBox().create_from_points(o3d.utility.Vector3dVector(box))
-        #     abb.color = np.array([1, 0, 0])
-        #     vis_list.append(abb)
-        #
-        # o3d.visualization.draw_geometries(vis_list)
+        import open3d as o3d
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(data_dict["point_clouds"][i, :, 0:3].cpu().numpy())
+        pcd.colors = o3d.utility.Vector3dVector((data_dict["pcl_color"][i].cpu().numpy() / 255))
+        vis_list = [pcd]
+        for box in pred_bbox_corners:
+            abb = o3d.geometry.AxisAlignedBoundingBox().create_from_points(o3d.utility.Vector3dVector(box))
+            abb.color = np.array([1, 0, 0])
+            vis_list.append(abb)
+
+        o3d.visualization.draw_geometries(vis_list)
         min_max_bound = np.stack((pred_bbox_corners.min(1), pred_bbox_corners.max(1)), axis=1)
         for j in range(lang_chunk_size):
             if j < data_dict["lang_num"][i]:

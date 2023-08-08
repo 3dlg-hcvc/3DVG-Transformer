@@ -3,6 +3,7 @@ import torch.nn as nn
 from models.transformer.attention import MultiHeadAttention
 import random
 from macro import *
+from utils.nn_distance import nn_distance
 
 class MatchModule(nn.Module):
     def __init__(self, num_proposals=256, lang_size=256, hidden_size=128, lang_num_size=300, det_channel=288*4, head=4, depth=2):
@@ -80,7 +81,28 @@ class MatchModule(nn.Module):
 
         batch_size, num_proposal = features.shape[:2]
 
-        objectness_masks = data_dict['objectness_scores'].max(2)[1].unsqueeze(2)  # batch_size, num_proposals, 1
+        if not USE_GT:
+            objectness_masks = data_dict['objectness_scores'].max(2)[1].unsqueeze(2)  # batch_size, num_proposals, 1
+        else:
+            aggregated_vote_xyz = data_dict['aggregated_vote_xyz']
+            gt_center = data_dict['center_label'][:, :, 0:3]
+
+            B = gt_center.shape[0]
+            K = aggregated_vote_xyz.shape[1]
+            # K2 = gt_center.shape[1]
+            dist1, ind1, dist2, _ = nn_distance(aggregated_vote_xyz, gt_center)  # dist1: BxK, dist2: BxK2
+            NEAR_THRESHOLD = 0.3
+            # Generate objectness label and mask
+            # objectness_label: 1 if pred object center is within NEAR_THRESHOLD of any GT object
+            # objectness_mask: 0 if pred object center is in gray zone (DONOTCARE), 1 otherwise
+            euclidean_dist1 = torch.sqrt(dist1 + 1e-6)
+            objectness_label = torch.zeros((B, K), dtype=torch.long, device="cuda")
+            objectness_label[euclidean_dist1 < NEAR_THRESHOLD] = 1
+
+            objectness_masks = objectness_label.unsqueeze(2)
+
+            data_dict['object_assignment'] = ind1
+            data_dict["tmp_objectness_masks"] = objectness_masks
 
 
 

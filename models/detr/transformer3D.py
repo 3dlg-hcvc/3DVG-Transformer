@@ -16,6 +16,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 from ..transformer.attention import MultiHeadAttention as MyMultiHeadAttention
+from utils.nn_distance import nn_distance, huber_loss
+
 
 
 # copy from proposal codes TODO!
@@ -45,9 +47,10 @@ def decode_scores_boxes(output_dict, end_points, num_heading_bin, num_size_clust
         #     pred_boxes = pred_boxes + base_xyz  # residual
     # else:
     #     raise NotImplementedError('center without bias(for decoder): not Implemented')
-
-    center = pred_boxes[:,:,0:3] # (batch_size, num_proposal, 3) TODO RESIDUAL
-    end_points['center'] = center
+    # if not USE_GT:
+    end_points['center'] = pred_boxes[:,:,0:3] # (batch_size, num_proposal, 3) TODO RESIDUAL
+# else:
+#     end_points['center'] = end_points['center_label'][:, :, 0:3]
 
     heading_scores = pred_boxes[:,:,3:3+num_heading_bin]  # theta; todo change it
     heading_residuals_normalized = pred_boxes[:,:,3+num_heading_bin:3+num_heading_bin*2]
@@ -66,23 +69,32 @@ def decode_scores_boxes(output_dict, end_points, num_heading_bin, num_size_clust
 
 
     # if USE_GT:
+    #     aggregated_vote_xyz = end_points['aggregated_vote_xyz']
+    #     gt_center = end_points['center_label'][:, :, 0:3]
+    #
+    #     B = gt_center.shape[0]
+    #     K = aggregated_vote_xyz.shape[1]
+    #     # K2 = gt_center.shape[1]
+    #     dist1, ind1, dist2, _ = nn_distance(aggregated_vote_xyz, gt_center)
+    #     end_points["object_assignment"] = ind1
+    #
     #     pred_center = end_points['center_label']  # (B,MAX_NUM_OBJ,3)
-    #     pred_heading_class = end_points['heading_class_label']  # B,K2
-    #     pred_heading_residual = end_points['heading_residual_label']  # B,K2
+    #     # pred_heading_class = end_points['heading_class_label']  # B,K2
+    #     # pred_heading_residual = end_points['heading_residual_label']  # B,K2
     #     pred_size_class = end_points['size_class_label']  # B,K2
     #     pred_size_residual = end_points['size_residual_label']  # B,K2,3
     #
     #     # assign
     #     pred_center = torch.gather(pred_center, 1, end_points["object_assignment"].unsqueeze(2).repeat(1, 1, 3))
-    #     pred_heading_class = torch.gather(pred_heading_class, 1, end_points["object_assignment"])
-    #     pred_heading_residual = torch.gather(pred_heading_residual, 1, end_points["object_assignment"]).unsqueeze(-1)
+    #     # pred_heading_class = torch.gather(pred_heading_class, 1, end_points["object_assignment"])
+    #     # pred_heading_residual = torch.gather(pred_heading_residual, 1, end_points["object_assignment"]).unsqueeze(-1)
     #     pred_size_class = torch.gather(pred_size_class, 1, end_points["object_assignment"])
     #     pred_size_residual = torch.gather(pred_size_residual, 1,
     #                                       end_points["object_assignment"].unsqueeze(2).repeat(1, 1, 3))
     #
     #     end_points['center'] = pred_center
-    #     end_points['heading_scores'] = pred_heading_class
-    #     end_points['heading_residuals'] = pred_heading_residual
+    #     end_points['heading_scores'] = torch.zeros(size=(pred_center.shape[0], pred_center.shape[1], 1), device="cuda", dtype=torch.float32)
+    #     end_points['heading_residuals'] = torch.zeros_like(end_points['heading_scores'])
     #     end_points['size_scores'] = pred_size_class
     #     end_points['size_residuals'] = pred_size_residual
 

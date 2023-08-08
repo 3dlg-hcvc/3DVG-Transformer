@@ -115,7 +115,7 @@ class RefNet(nn.Module):
             data_dict["seed_xyz"] = xyz
             data_dict["seed_features"] = features
 
-            xyz, features = self.vgen(data_dict, xyz, features, use_gt=USE_GT)
+            xyz, features = self.vgen(data_dict, xyz, features)
             features_norm = torch.norm(features, p=2, dim=1)
             features = features.div(features_norm.unsqueeze(1))
             data_dict["vote_xyz"] = xyz
